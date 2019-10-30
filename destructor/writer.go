@@ -84,11 +84,7 @@ func writeWrapperStruct(w io.Writer, iface *Interface) {
 	for _, method := range iface.WrapperStruct.PublicMethods {
 		if method.ReturnType != nil {
 			printf(w, "func (o *%s) %s(%s) (%s) {\n", iface.WrapperStruct.Name, method.Name, formatParams(method.Params), formatParams(method.ReturnType))
-			if method.IsFieldGetter {
-				printf(w, "\treturn o.impl.%s\n", method.Field.Name)
-			} else {
-				printf(w, "\treturn o.impl.%s(%s)\n", method.Name, formatParamsCall(method.Params))
-			}
+			writeFunctionImpl(w, method)
 		} else {
 			printf(w, "func (o *%s) %s(%s) {\n", iface.WrapperStruct.Name, method.Name, formatParams(method.Params))
 			if method.IsFieldSetter {
@@ -105,7 +101,7 @@ func formatParamsCall(params ParamsList) string {
 	var strs []string
 	for _, p := range params {
 		if p.Interface != nil {
-			if p.Type.IsPtr {
+			if p.Type.OriginalType.IsPtr {
 				strs = append(strs, fmt.Sprintf("%s.GetImpl()", p.Name))
 			} else {
 				strs = append(strs, fmt.Sprintf("*%s.GetImpl()", p.Name))
@@ -115,6 +111,43 @@ func formatParamsCall(params ParamsList) string {
 		}
 	}
 	return strings.Join(strs, ", ")
+}
+
+func writeFunctionImpl(w io.Writer, method *Method) {
+	var localVarNames []string
+	for i, _ := range method.ReturnType {
+		localVarNames = append(localVarNames, fmt.Sprintf("v%d", i))
+	}
+
+	if method.IsFieldGetter {
+		printf(w, "\t%s := o.impl.%s\n", strings.Join(localVarNames, ", "), method.Field.Name)
+	} else {
+		printf(w, "\t%s := o.impl.%s(%s)\n", strings.Join(localVarNames, ", "), method.Name, formatParamsCall(method.Params))
+	}
+
+	for i, p := range method.ReturnType {
+		if p.Interface != nil {
+			oldVarName := localVarNames[i]
+			newVarName := fmt.Sprintf("newv%d", i)
+			localVarNames[i] = newVarName
+
+			newFuncName := fmt.Sprintf("New%s", p.Interface.Name)
+			if p.Type.LocalPkgName() != "" {
+				newFuncName = p.Type.LocalPkgName() + "." + newFuncName
+			}
+
+			if p.Type.IsArray {
+				printf(w, "\tvar %s %s\n", newVarName, formatType(p.Type))
+				printf(w, "\tfor _, v := range %s {\n", oldVarName)
+				printf(w, "\t\t%s = append(%s, %s(v))\n", newVarName, newVarName, newFuncName)
+				printf(w, "\t}\n")
+			} else {
+				printf(w, "\t%s := %s(%s)\n", newVarName, newFuncName, oldVarName)
+			}
+		}
+	}
+
+	printf(w, "\treturn %s\n", strings.Join(localVarNames, ", "))
 }
 
 func formatParams(params ParamsList) string {

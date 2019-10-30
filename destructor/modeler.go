@@ -156,12 +156,19 @@ func (m *modeler) convertTypeForFile(f *File, t *Type) (*Type, *Import, *Interfa
 	}
 
 	var newType = *t // shallow copy
+	newType.OriginalType = t
 	newType.FullName = ""
 
 	var iface *Interface
 	fullTypeName := t.FullName
 	prefix := "orig_"
 	if wrapper, ok := m.wrapperStore[fullTypeName]; ok {
+		if newType.IsArray {
+			newType.IsArrayTypePtr = false
+		} else {
+			newType.IsPtr = false
+		}
+
 		if wrapper.File.Package.Path == f.Package.Path {
 			newType.Name = wrapper.Name
 			return &newType, nil, wrapper

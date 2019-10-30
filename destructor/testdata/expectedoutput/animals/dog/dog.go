@@ -26,27 +26,25 @@ func (o *dogWrapper) GetImpl() *orig_dog.Dog {
 }
 
 func (o *dogWrapper) Describe() orig_animals.AnimalDescription {
-	v0 := o.impl.Describe()
-	return v0
+	return o.impl.Describe()
 }
 
 func (o *dogWrapper) Barks() bool {
-	v0 := o.impl.Barks()
-	return v0
+	return o.impl.Barks()
 }
 
 func (o *dogWrapper) Meows() bool {
-	v0 := o.impl.Meows()
-	return v0
+	return o.impl.Meows()
 }
 
 func (o *dogWrapper) Eat(f food.Food) int {
-	v0 := o.impl.Eat(f.GetImpl())
-	return v0
+	return o.impl.Eat(f.GetImpl())
 }
 
 func (o *dogWrapper) Clone() (Dog, error) {
-	v0, v1 := o.impl.Clone()
-	newv0 := NewDog(v0)
-	return newv0, v1
+	v, err := o.impl.Clone()
+	if err != nil {
+		return nil, err
+	}
+	return NewDog(v), nil
 }

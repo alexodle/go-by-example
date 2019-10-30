@@ -23,8 +23,7 @@ func (o *animalsWrapper) GetImpl() *orig_animals.Animals {
 }
 
 func (o *animalsWrapper) GetLocations() []orig_animals.Location {
-	v0 := o.impl.Locations
-	return v0
+	return o.impl.Locations
 }
 
 func (o *animalsWrapper) SetLocations(v []orig_animals.Location) {
@@ -32,10 +31,9 @@ func (o *animalsWrapper) SetLocations(v []orig_animals.Location) {
 }
 
 func (o *animalsWrapper) GetAllDogs() []dog.Dog {
-	v0 := o.impl.GetAllDogs()
-	var newv0 []dog.Dog
-	for _, v := range v0 {
-		newv0 = append(newv0, dog.NewDog(v))
+	var arr []dog.Dog
+	for _, v := range o.impl.GetAllDogs() {
+		arr = append(arr, dog.NewDog(v))
 	}
-	return newv0
+	return arr
 }

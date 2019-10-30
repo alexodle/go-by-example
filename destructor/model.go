@@ -1,5 +1,7 @@
 package destructor
 
+import "strings"
+
 type StructStore map[string]*Struct
 type ImportStore map[string]*Import
 type InterfaceStore map[string]*Interface
@@ -66,4 +68,13 @@ type Type struct {
 	IsPtr          bool
 	IsArray        bool
 	IsArrayTypePtr bool
+	OriginalType   *Type
+}
+
+func (t *Type) LocalPkgName() string {
+	parts := strings.Split(t.Name, ".")
+	if len(parts) == 2 {
+		return parts[0]
+	}
+	return ""
 }
