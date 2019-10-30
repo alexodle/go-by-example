@@ -56,8 +56,14 @@ type Method struct {
 
 type Param struct {
 	Name string
-	IsPtr bool
-	TypeName string
-	FullTypeName string
+	Type *Type
 	Interface *Interface
+}
+
+type Type struct {
+	FullName string
+	Name string
+	IsPtr bool
+	IsArray bool
+	IsArrayTypePtr bool
 }

@@ -105,7 +105,7 @@ func formatParamsCall(params ParamsList) string {
 	var strs []string
 	for _, p := range params {
 		if p.Interface != nil {
-			if p.IsPtr {
+			if p.Type.IsPtr {
 				strs = append(strs, fmt.Sprintf("%s.GetImpl()", p.Name))
 			} else {
 				strs = append(strs, fmt.Sprintf("*%s.GetImpl()", p.Name))
@@ -120,17 +120,29 @@ func formatParamsCall(params ParamsList) string {
 func formatParams(params ParamsList) string {
 	var strs []string
 	for _, p := range params {
-		typeName := p.TypeName
-		if p.IsPtr {
-			typeName = "*" + typeName
-		}
+		typeStr := formatType(p.Type)
 		if p.Name != "" {
-			strs = append(strs, fmt.Sprintf("%s %s", p.Name, typeName))
+			strs = append(strs, fmt.Sprintf("%s %s", p.Name, typeStr))
 		} else {
-			strs = append(strs, typeName)
+			strs = append(strs, typeStr)
 		}
 	}
 	return strings.Join(strs, ", ")
+}
+
+func formatType(t *Type) string {
+	var parts []string
+	if t.IsPtr {
+		parts = append(parts, "*")
+	}
+	if t.IsArray {
+		parts = append(parts, "[]")
+		if t.IsArrayTypePtr {
+			parts = append(parts, "*")
+		}
+	}
+	parts = append(parts, t.Name)
+	return strings.Join(parts, "")
 }
 
 func printf(w io.Writer, s string, args... interface{}) {

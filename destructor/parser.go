@@ -119,7 +119,7 @@ func fillMethods(node ast.Node, directory string, structs StructStore, store Imp
 		case *ast.FuncDecl:
 			m := newMethod(v, structs, pkg, store)
 			if m.Receiver != nil && isPublic(m.Name) {
-				s := structs[m.Receiver.FullTypeName]
+				s := structs[m.Receiver.Type.FullName]
 				s.PublicMethods = append(s.PublicMethods, m)
 			}
 		case *ast.TypeSpec:
@@ -159,10 +159,10 @@ func newFields(v *ast.StructType, structs StructStore, pkg *Package, imports Imp
 	var fields ParamsList
 	if v.Fields != nil {
 		for _, f := range v.Fields.List {
-			fullTypeName, typeName, isPtr := getTypeName(f.Type, structs, pkg, imports)
+			t := getTypeName(f.Type, structs, pkg, imports)
 			for _, pn := range f.Names {
 				if isPublic(pn.Name) {
-					fields = append(fields, &Param{Name: pn.Name, IsPtr: isPtr, TypeName: typeName, FullTypeName: fullTypeName})
+					fields = append(fields, &Param{Name: pn.Name, Type: t})
 				}
 			}
 		}
@@ -182,13 +182,13 @@ func newMethod(v *ast.FuncDecl, structs StructStore, pkg *Package, imports Impor
 func getReturnParams(v *ast.FuncDecl, structs StructStore, pkg *Package, imports ImportStore) ParamsList {
 	var params []*Param
 	for _, p := range v.Type.Results.List {
-		fullTypeName, typeName, isPtr := getTypeName(p.Type, structs, pkg, imports)
+		t := getTypeName(p.Type, structs, pkg, imports)
 		if p.Names != nil {
 			for _, pn := range p.Names {
-				params = append(params, &Param{Name: pn.Name, IsPtr: isPtr, TypeName: typeName, FullTypeName: fullTypeName})
+				params = append(params, &Param{Name: pn.Name, Type: t})
 			}
 		} else {
-			params = append(params, &Param{IsPtr:isPtr, TypeName: typeName, FullTypeName:typeName})
+			params = append(params, &Param{Type: t})
 		}
 	}
 	return params
@@ -197,15 +197,15 @@ func getReturnParams(v *ast.FuncDecl, structs StructStore, pkg *Package, imports
 func getParams(v *ast.FuncDecl, structs StructStore, pkg *Package, imports ImportStore) ParamsList {
 	var params []*Param
 	for _, p := range v.Type.Params.List {
-		fullTypeName, typeName, isPtr := getTypeName(p.Type, structs, pkg, imports)
+		t := getTypeName(p.Type, structs, pkg, imports)
 		for _, pn := range p.Names {
-			params = append(params, &Param{Name: pn.Name, IsPtr: isPtr, TypeName: typeName, FullTypeName: fullTypeName})
+			params = append(params, &Param{Name: pn.Name, Type: t})
 		}
 	}
 	return params
 }
 
-func getTypeName(exp ast.Expr, structs StructStore, pkg *Package, imports ImportStore) (string, string, bool) {
+func getTypeName(exp ast.Expr, structs StructStore, pkg *Package, imports ImportStore) *Type {
 	var fullName string
 	var name string
 	switch xv := exp.(type) {
@@ -213,14 +213,23 @@ func getTypeName(exp ast.Expr, structs StructStore, pkg *Package, imports Import
 		fullName = xv.Name
 		name = fullName
 	case *ast.StarExpr:
-		fullName, name, _ := getTypeName(xv.X, structs, pkg, imports)
-		return fullName, name, true
+		tn := getTypeName(xv.X, structs, pkg, imports)
+		tn.IsPtr = true
+		return tn
 	case *ast.SelectorExpr:
-		pkgName, _, _ := getTypeName(xv.X, structs, pkg, imports)
-		fullName = pkgName + "." + xv.Sel.Name
+		tn := getTypeName(xv.X, structs, pkg, imports)
+		fullName = tn.FullName + "." + xv.Sel.Name
 		name = fullName
-		if imp, ok := imports[pkgName]; ok {
+		if imp, ok := imports[tn.FullName]; ok {
 			fullName = imp.Path + "." + xv.Sel.Name
+		}
+	case *ast.ArrayType:
+		tn := getTypeName(xv.Elt, structs, pkg, imports)
+		return &Type{
+			FullName: tn.FullName,
+			Name: tn.Name,
+			IsArray: true,
+			IsArrayTypePtr: tn.IsPtr,
 		}
 	default:
 		panic(fmt.Sprintf("no type found: %T", exp))
@@ -231,7 +240,7 @@ func getTypeName(exp ast.Expr, structs StructStore, pkg *Package, imports Import
 		fullName = potentialFullName
 	}
 
-	return fullName, name, false
+	return &Type{FullName: fullName, Name: name}
 }
 
 
@@ -239,12 +248,10 @@ func maybeNewReceiver(fn *ast.FuncDecl, structs StructStore, pkg *Package) *Para
 	var rec *Param
 
 	for _, f := range fn.Recv.List {
-		fullTypeName, typeName, isPtr := getTypeName(f.Type, structs, pkg, nil)
+		t := getTypeName(f.Type, structs, pkg, nil)
 		rec = &Param{
 			Name: f.Names[0].Name,
-			IsPtr: isPtr,
-			TypeName: typeName,
-			FullTypeName: fullTypeName,
+			Type: t,
 		}
 		break
 	}
