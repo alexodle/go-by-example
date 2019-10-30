@@ -1,0 +1,35 @@
+## Dry run diff results - {{ .JobName }}
+
+{{ .GenericMap }}
+
+{{if .ColorDiffs -}}
+
+<details>
+<summary>Diffs</summary>
+
+{{- range .ColorDiffs}}
+
+## {{ .Color}}
+
+{{- if .DetectedGeneratedFileChange}}
+
+*Detected generated file changes, but omitting them here*
+{{end -}}
+
+{{- range .Diffs}}
+
+**{{ .Filename}}**
+```
+{{ .Contents}}
+```
+{{- end}}
+
+{{- end}}
+
+</details>
+
+{{- else -}}
+
+**NO DIFFS**
+
+{{- end}}
