@@ -44,7 +44,9 @@ func (m *modeler) buildWrappers() {
 		if !ok {
 			newFile = &File{
 				Path:    newPath,
-				Imports: ImportStore{},
+				Imports: ImportStore{
+					"orig_"+st.File.Package.Name: &Import{ExplicitName: "orig_" + st.File.Package.Name, Path: st.File.Package.Path},
+				},
 				Package: &Package{
 					Name: st.File.Package.Name,
 					Path: strings.Replace(st.File.Package.Path, m.inputDir, m.outputDir, 1),

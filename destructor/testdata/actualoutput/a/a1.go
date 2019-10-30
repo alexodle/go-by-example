@@ -1,7 +1,7 @@
 package a
 
-import orig_a "github.com/alexodle/go-by-example/destructor/testdata/input/a"
 import ab "github.com/alexodle/go-by-example/destructor/testdata/actualoutput/a/ab"
+import orig_a "github.com/alexodle/go-by-example/destructor/testdata/input/a"
 
 type A interface {
 	GetImpl() *orig_a.A

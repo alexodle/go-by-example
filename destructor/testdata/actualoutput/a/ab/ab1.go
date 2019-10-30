@@ -1,5 +1,6 @@
 package ab
 
+import orig_ab "github.com/alexodle/go-by-example/destructor/testdata/input/a/ab"
 
 type AB interface {
 	GetImpl() *orig_ab.AB
