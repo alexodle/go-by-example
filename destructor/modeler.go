@@ -78,6 +78,39 @@ func (m *modeler) fillWrappers() {
 			PublicMethods: MethodList{},
 		}
 
+		fields, fieldImps := m.convertTypesForFile(iface.File, iface.OriginalStruct.Fields)
+		for _, f := range fields {
+			setParams := ParamsList{&Param{Name: "v", TypeName:f.TypeName}}
+			getReturnType := ParamsList{&Param{TypeName:f.TypeName}}
+			iface.Methods = append(iface.Methods,
+				&Method{
+					Name: "Get"+f.Name,
+					ReturnType: getReturnType,
+				},
+				&Method{
+					Name: "Set"+f.Name,
+					Params: setParams,
+				},
+			)
+			iface.WrapperStruct.PublicMethods = append(iface.WrapperStruct.PublicMethods,
+				&Method{
+					Name: "Get"+f.Name,
+					Receiver: &Param{Name: "o", TypeName: newStructName},
+					ReturnType: getReturnType,
+					IsFieldGetter: true,
+					Field: f,
+				},
+				&Method{
+					Name: "Set"+f.Name,
+					Receiver: &Param{Name: "o", TypeName: newStructName},
+					Params: setParams,
+					IsFieldSetter: true,
+					Field: f,
+				},
+			)
+		}
+		mergeImportStores(iface.File.Imports, fieldImps)
+
 		for _, method := range iface.OriginalStruct.PublicMethods {
 			params, imps1 := m.convertTypesForFile(iface.File, method.Params)
 			returnType, imps2 := m.convertTypesForFile(iface.File, method.ReturnType)

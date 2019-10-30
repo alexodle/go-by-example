@@ -70,10 +70,18 @@ func writeWrapperStruct(w io.Writer, iface *Interface) {
 	for _, method := range iface.WrapperStruct.PublicMethods {
 		if method.ReturnType != nil {
 			printf(w, "func (o *%s) %s(%s) (%s) {\n", iface.WrapperStruct.Name, method.Name, formatParams(method.Params), formatParams(method.ReturnType))
-			printf(w, "\treturn o.impl.%s(%s)\n", method.Name, formatParamsCall(method.Params))
+			if method.IsFieldGetter {
+				printf(w, "\treturn o.impl.%s\n", method.Field.Name)
+			} else {
+				printf(w, "\treturn o.impl.%s(%s)\n", method.Name, formatParamsCall(method.Params))
+			}
 		} else {
 			printf(w, "func (o *%s) %s(%s) {\n", iface.WrapperStruct.Name, method.Name, formatParams(method.Params))
-			printf(w, "\to.impl.%s(%s)\n", method.Name, formatParamsCall(method.Params))
+			if method.IsFieldSetter {
+				printf(w, "\to.impl.%s = %s\n", method.Field.Name, method.Params[0].Name)
+			} else {
+				printf(w, "\to.impl.%s(%s)\n", method.Name, formatParamsCall(method.Params))
+			}
 		}
 		printf(w, "}\n\n")
 	}

@@ -41,6 +41,7 @@ type Struct struct {
 	Name string
 	FullName string
 	PublicMethods MethodList
+	Fields ParamsList
 }
 
 type Method struct {
@@ -48,6 +49,9 @@ type Method struct {
 	Receiver *Param
 	Params ParamsList
 	ReturnType ParamsList
+	IsFieldSetter bool
+	IsFieldGetter bool
+	Field *Param
 }
 
 type Param struct {

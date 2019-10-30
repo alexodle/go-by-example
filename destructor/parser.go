@@ -107,6 +107,10 @@ func parseStructsFromFile(fset *token.FileSet, filepath string, directory string
 	fillStructs(f, directory, structs, &File{Path:filepath, Imports: createImportStore(f), Package:getPkg(directory)})
 }
 
+func isPublic(name string) bool {
+	return strings.ToUpper(name[0:1]) == name[0:1]
+}
+
 func fillMethods(node ast.Node, directory string, structs StructStore, store ImportStore) {
 	pkg := getPkg(directory)
 
@@ -114,36 +118,19 @@ func fillMethods(node ast.Node, directory string, structs StructStore, store Imp
 		switch v := node.(type) {
 		case *ast.FuncDecl:
 			m := newMethod(v, structs, pkg, store)
-			if m.Receiver != nil && strings.ToUpper(m.Name[0:1]) == m.Name[0:1] {
+			if m.Receiver != nil && isPublic(m.Name) {
 				s := structs[m.Receiver.FullTypeName]
 				s.PublicMethods = append(s.PublicMethods, m)
+			}
+		case *ast.TypeSpec:
+			if t, ok := v.Type.(*ast.StructType); ok {
+				structName := fullTypeName(pkg, v.Name.Name)
+				fields := newFields(t, structs, pkg, store)
+				structs[structName].Fields = fields
 			}
 		}
 		return true
 	}), node)
-}
-
-func getPkg(directory string) *Package {
-	fullPath, err := filepath.Abs(directory)
-	if err != nil {
-		panic(err)
-	}
-	gopath := os.Getenv("GOPATH")
-	fullPath = strings.TrimPrefix(fullPath, gopath + "/src/")
-	pkgs, err := packages.Load(nil, fullPath)
-	if err != nil {
-		panic(err)
-	} else if (len(pkgs) != 1) {
-		panic(fmt.Sprintf("found multiple packages for directory: %s", directory))
-	}
-	pkg := pkgs[0]
-	if pkg.Errors != nil {
-		panic(pkg.Errors[0])
-	}
-	return &Package{
-		Path: pkg.PkgPath,
-		Name: pkg.Name,
-	}
 }
 
 func fillStructs(node ast.Node, directory string, structs StructStore, file *File) {
@@ -166,6 +153,21 @@ func newStruct(v *ast.TypeSpec, file *File) *Struct {
 		FullName: fullTypeName(file.Package, v.Name.Name),
 		PublicMethods: MethodList{},
 	}
+}
+
+func newFields(v *ast.StructType, structs StructStore, pkg *Package, imports ImportStore) ParamsList {
+	var fields ParamsList
+	if v.Fields != nil {
+		for _, f := range v.Fields.List {
+			fullTypeName, typeName, isPtr := getTypeName(f.Type, structs, pkg, imports)
+			for _, pn := range f.Names {
+				if isPublic(pn.Name) {
+					fields = append(fields, &Param{Name: pn.Name, IsPtr: isPtr, TypeName: typeName, FullTypeName: fullTypeName})
+				}
+			}
+		}
+	}
+	return fields
 }
 
 func newMethod(v *ast.FuncDecl, structs StructStore, pkg *Package, imports ImportStore) *Method {
@@ -256,4 +258,27 @@ func maybeNewReceiver(fn *ast.FuncDecl, structs StructStore, pkg *Package) *Para
 
 func fullTypeName(pkg *Package, typeName string) string {
 	return strings.Join([]string{pkg.Path, typeName}, ".")
+}
+
+func getPkg(directory string) *Package {
+	fullPath, err := filepath.Abs(directory)
+	if err != nil {
+		panic(err)
+	}
+	gopath := os.Getenv("GOPATH")
+	fullPath = strings.TrimPrefix(fullPath, gopath + "/src/")
+	pkgs, err := packages.Load(nil, fullPath)
+	if err != nil {
+		panic(err)
+	} else if (len(pkgs) != 1) {
+		panic(fmt.Sprintf("found multiple packages for directory: %s", directory))
+	}
+	pkg := pkgs[0]
+	if pkg.Errors != nil {
+		panic(pkg.Errors[0])
+	}
+	return &Package{
+		Path: pkg.PkgPath,
+		Name: pkg.Name,
+	}
 }
