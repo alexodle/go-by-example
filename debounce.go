@@ -1,8 +1,8 @@
 package main
 
 import (
-"fmt"
-"time"
+	"fmt"
+	"time"
 )
 
 func debounce(interval time.Duration, input chan int, f func(arg int)) {

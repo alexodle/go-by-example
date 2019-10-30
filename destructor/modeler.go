@@ -21,11 +21,11 @@ func Remodel(structs StructStore, inputDir, outputDir string) []*File {
 	return filesList
 }
 
-type modeler struct{
-	structStore StructStore
+type modeler struct {
+	structStore  StructStore
 	wrapperStore InterfaceStore
-	inputDir string
-	outputDir string
+	inputDir     string
+	outputDir    string
 }
 
 func shouldWrap(st *Struct) bool {
@@ -43,9 +43,9 @@ func (m *modeler) buildWrappers() {
 		newFile, ok := newFiles[newPath]
 		if !ok {
 			newFile = &File{
-				Path:    newPath,
+				Path: newPath,
 				Imports: ImportStore{
-					"orig_"+st.File.Package.Name: &Import{ExplicitName: "orig_" + st.File.Package.Name, Path: st.File.Package.Path},
+					"orig_" + st.File.Package.Name: &Import{ExplicitName: "orig_" + st.File.Package.Name, Path: st.File.Package.Path},
 				},
 				Package: &Package{
 					Name: st.File.Package.Name,
@@ -56,11 +56,11 @@ func (m *modeler) buildWrappers() {
 		}
 
 		newIFace := &Interface{
-			File: newFile,
-			Name: st.Name,
-			FullName: newFile.Package.Path + "." + st.Name,
-			Methods: MethodList{},
-			OriginalStruct: st,
+			File:                   newFile,
+			Name:                   st.Name,
+			FullName:               newFile.Package.Path + "." + st.Name,
+			Methods:                MethodList{},
+			OriginalStruct:         st,
 			OriginalStructTypeName: "orig_" + st.File.Package.Name + "." + st.Name,
 		}
 		m.wrapperStore[key] = newIFace
@@ -74,9 +74,9 @@ func (m *modeler) fillWrappers() {
 		recvParam := &Param{Name: "o", Type: &Type{IsPtr: true, Name: newStructName}}
 
 		iface.WrapperStruct = &Struct{
-			File: iface.File,
-			Name: newStructName,
-			FullName: newStructName,
+			File:          iface.File,
+			Name:          newStructName,
+			FullName:      newStructName,
 			PublicMethods: MethodList{},
 		}
 
@@ -86,28 +86,28 @@ func (m *modeler) fillWrappers() {
 			getReturnType := ParamsList{&Param{Type: f.Type}}
 			iface.Methods = append(iface.Methods,
 				&Method{
-					Name: "Get"+f.Name,
+					Name:       "Get" + f.Name,
 					ReturnType: getReturnType,
 				},
 				&Method{
-					Name: "Set"+f.Name,
+					Name:   "Set" + f.Name,
 					Params: setParams,
 				},
 			)
 			iface.WrapperStruct.PublicMethods = append(iface.WrapperStruct.PublicMethods,
 				&Method{
-					Name: "Get"+f.Name,
-					Receiver: recvParam,
-					ReturnType: getReturnType,
+					Name:          "Get" + f.Name,
+					Receiver:      recvParam,
+					ReturnType:    getReturnType,
 					IsFieldGetter: true,
-					Field: f,
+					Field:         f,
 				},
 				&Method{
-					Name: "Set"+f.Name,
-					Receiver: recvParam,
-					Params: setParams,
+					Name:          "Set" + f.Name,
+					Receiver:      recvParam,
+					Params:        setParams,
 					IsFieldSetter: true,
-					Field: f,
+					Field:         f,
 				},
 			)
 		}
@@ -117,15 +117,15 @@ func (m *modeler) fillWrappers() {
 			params, imps1 := m.convertTypesForFile(iface.File, method.Params)
 			returnType, imps2 := m.convertTypesForFile(iface.File, method.ReturnType)
 			iface.Methods = append(iface.Methods, &Method{
-				Name: method.Name,
-				Params: params,
+				Name:       method.Name,
+				Params:     params,
 				ReturnType: returnType,
 			})
 			iface.WrapperStruct.PublicMethods = append(iface.WrapperStruct.PublicMethods, &Method{
-				Name: method.Name,
-				Params: params,
+				Name:       method.Name,
+				Params:     params,
 				ReturnType: returnType,
-				Receiver: recvParam,
+				Receiver:   recvParam,
 			})
 			mergeImportStores(iface.File.Imports, imps1)
 			mergeImportStores(iface.File.Imports, imps2)
@@ -139,8 +139,8 @@ func (m *modeler) convertTypesForFile(f *File, params ParamsList) (ParamsList, I
 	for _, p := range params {
 		t, imp, iface := m.convertTypeForFile(f, p.Type)
 		newParams = append(newParams, &Param{
-			Name: p.Name,
-			Type: t,
+			Name:      p.Name,
+			Type:      t,
 			Interface: iface,
 		})
 		if imp != nil {
@@ -172,12 +172,12 @@ func (m *modeler) convertTypeForFile(f *File, t *Type) (*Type, *Import, *Interfa
 	}
 
 	parts := strings.Split(fullTypeName, "/")
-	typeNameStr := parts[len(parts) - 1]
+	typeNameStr := parts[len(parts)-1]
 	importName := strings.Split(typeNameStr, ".")[0]
-	importPath := strings.Join(parts[:len(parts) - 1], "/") + "/" + importName
+	importPath := strings.Join(parts[:len(parts)-1], "/") + "/" + importName
 
 	newType.Name = prefix + typeNameStr
-	return &newType, &Import{ ExplicitName: prefix + importName, Path: importPath}, iface
+	return &newType, &Import{ExplicitName: prefix + importName, Path: importPath}, iface
 }
 
 func mergeImportStores(a ImportStore, b ImportStore) {

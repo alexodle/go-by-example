@@ -16,7 +16,7 @@ type writeOp struct {
 	resp chan bool
 }
 type stats struct {
-	reads uint64
+	reads  uint64
 	writes uint64
 }
 type statsOp struct {
@@ -49,7 +49,7 @@ func main() {
 		}
 	}()
 
-	for i:=0; i<100; i++ {
+	for i := 0; i < 100; i++ {
 		go func() {
 			for {
 				read := &readOp{key: rand.Intn(100), resp: make(chan int)}
@@ -60,7 +60,7 @@ func main() {
 		}()
 	}
 
-	for i:=0; i<10; i++ {
+	for i := 0; i < 10; i++ {
 		go func() {
 			for {
 				write := &writeOp{key: rand.Intn(100), val: rand.Intn(1000), resp: make(chan bool)}

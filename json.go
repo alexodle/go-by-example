@@ -5,10 +5,9 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-
 type SampleStruct struct {
-	Rest map[string]interface{} `yaml:",inline"`
-	NumberString  string `yaml:"number_str,omitempty" validate:"nonzero"`
+	Rest         map[string]interface{} `yaml:",inline"`
+	NumberString string                 `yaml:"number_str,omitempty" validate:"nonzero"`
 }
 
 type Sample2 struct {
@@ -39,7 +38,6 @@ func getType() interface{} {
 	return new(Sample2)
 }
 
-
 func readWrite() {
 	obj := getType()
 
@@ -69,8 +67,6 @@ another_obj:
 		panic(err)
 	}
 	fmt.Println(string(str))
-
-
 
 	fmt.Println()
 	fmt.Println()

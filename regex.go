@@ -26,6 +26,7 @@ func match(ex string) {
 }
 
 var statusCodeRegex = regexp.MustCompile(`Code: ([0-9][0-9][0-9])\.`)
+
 func extractStatusCodeFromVaultError(err error) (int, bool) {
 	if extract := statusCodeRegex.FindStringSubmatch(err.Error()); extract != nil {
 		if statusCode, convErr := strconv.Atoi(extract[1]); convErr == nil {

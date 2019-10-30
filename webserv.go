@@ -1,10 +1,10 @@
 package main
 
 import (
-"flag"
-"html/template"
-"log"
-"net/http"
+	"flag"
+	"html/template"
+	"log"
+	"net/http"
 )
 
 var addr = flag.String("addr", ":1718", "http service address") // Q=17, R=18

@@ -16,17 +16,20 @@ type Keyer interface {
 	Key() interface{}
 }
 
-type K1 struct {}
+type K1 struct{}
+
 func (k *K1) Key() interface{} {
 	return "hi"
 }
 
-type K2 struct {}
+type K2 struct{}
+
 func (k *K2) Key() interface{} {
 	return [2]string{"hi", "hello"}
 }
 
-type K3 struct {}
+type K3 struct{}
+
 func (k *K3) Key() interface{} {
 	return [2]string{"hi", "hello"}
 }

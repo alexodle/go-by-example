@@ -3,7 +3,7 @@ package main
 import "fmt"
 
 const (
-	metadataServiceIP = "169.254.169.254"
+	metadataServiceIP      = "169.254.169.254"
 	metadataServiceVersion = "2019-06-04"
 )
 

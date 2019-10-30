@@ -145,7 +145,7 @@ func formatType(t *Type) string {
 	return strings.Join(parts, "")
 }
 
-func printf(w io.Writer, s string, args... interface{}) {
+func printf(w io.Writer, s string, args ...interface{}) {
 	_, err := fmt.Fprintf(w, s, args...)
 	if err != nil {
 		panic(err)

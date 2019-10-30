@@ -12,9 +12,9 @@ type Diff struct {
 }
 
 type ColorDiffs struct {
-	Color string
+	Color                       string
 	DetectedGeneratedFileChange bool
-	Diffs []Diff
+	Diffs                       []Diff
 }
 
 type DiffResultComment struct {
@@ -32,19 +32,19 @@ func main() {
 		JobName: "deployment-updater",
 		ColorDiffs: []ColorDiffs{
 			{
-				Color: "Blue",
+				Color:                       "Blue",
 				DetectedGeneratedFileChange: true,
 				Diffs: []Diff{
-					{ Filename: "a/b/c.yml", Contents: strings.TrimSpace("+hi\n-hello\n\n") },
-					{ Filename: "a/b/d.yml", Contents: strings.TrimSpace("+hello\n-hihi\n") },
+					{Filename: "a/b/c.yml", Contents: strings.TrimSpace("+hi\n-hello\n\n")},
+					{Filename: "a/b/d.yml", Contents: strings.TrimSpace("+hello\n-hihi\n")},
 				},
 			},
 			{
-				Color: "Orange",
+				Color:                       "Orange",
 				DetectedGeneratedFileChange: false,
 				Diffs: []Diff{
-					{ Filename: "a/b/c.yml", Contents: strings.TrimSpace("+hi\n-hello\n\n") },
-					{ Filename: "a/b/d.yml", Contents: strings.TrimSpace("+hello\n-hihi\n") },
+					{Filename: "a/b/c.yml", Contents: strings.TrimSpace("+hi\n-hello\n\n")},
+					{Filename: "a/b/d.yml", Contents: strings.TrimSpace("+hello\n-hihi\n")},
 				},
 			},
 		},

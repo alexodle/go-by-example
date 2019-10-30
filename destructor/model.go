@@ -11,7 +11,7 @@ type InterfaceList []*Interface
 type Import struct {
 	ImplicitName string
 	ExplicitName string
-	Path string
+	Path         string
 }
 
 type Package struct {
@@ -20,50 +20,50 @@ type Package struct {
 }
 
 type Interface struct {
-	File *File
-	Name string
-	FullName string
-	Methods MethodList
-	OriginalStruct *Struct
+	File                   *File
+	Name                   string
+	FullName               string
+	Methods                MethodList
+	OriginalStruct         *Struct
 	OriginalStructTypeName string
-	WrapperStruct *Struct
+	WrapperStruct          *Struct
 }
 
 type File struct {
-	Path string
-	Imports ImportStore
-	Package *Package
+	Path       string
+	Imports    ImportStore
+	Package    *Package
 	Interfaces InterfaceList
 }
 
 type Struct struct {
-	File *File
-	Name string
-	FullName string
+	File          *File
+	Name          string
+	FullName      string
 	PublicMethods MethodList
-	Fields ParamsList
+	Fields        ParamsList
 }
 
 type Method struct {
-	Name string
-	Receiver *Param
-	Params ParamsList
-	ReturnType ParamsList
+	Name          string
+	Receiver      *Param
+	Params        ParamsList
+	ReturnType    ParamsList
 	IsFieldSetter bool
 	IsFieldGetter bool
-	Field *Param
+	Field         *Param
 }
 
 type Param struct {
-	Name string
-	Type *Type
+	Name      string
+	Type      *Type
 	Interface *Interface
 }
 
 type Type struct {
-	FullName string
-	Name string
-	IsPtr bool
-	IsArray bool
+	FullName       string
+	Name           string
+	IsPtr          bool
+	IsArray        bool
 	IsArrayTypePtr bool
 }

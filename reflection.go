@@ -20,36 +20,35 @@ type ImportStore map[string]*Import
 type Import struct {
 	ImplicitName string
 	ExplicitName string
-	Path string
+	Path         string
 }
 
 type File struct {
-	Path string
+	Path    string
 	Imports ImportStore
 	Package *packages.Package
 }
 
 type Struct struct {
-	File *File
-	Name string
-	FullName string
+	File          *File
+	Name          string
+	FullName      string
 	PublicMethods []Method
 }
 
 type Method struct {
-	Name string
-	Receiver *Param
-	Params []Param
+	Name       string
+	Receiver   *Param
+	Params     []Param
 	ReturnType []Param
 }
 
 type Param struct {
-	Name string
-	IsPtr bool
-	TypeName string
+	Name         string
+	IsPtr        bool
+	TypeName     string
 	FullTypeName string
 }
-
 
 type walker func(ast.Node) bool
 
@@ -88,7 +87,7 @@ func GenWrappers(structs StructStore) {
 
 func typeWithImportName(fullTypeName string) string {
 	parts := strings.Split(fullTypeName, "/")
-	return parts[len(parts) - 1]
+	return parts[len(parts)-1]
 }
 
 func isWrappedStruct(st *Struct) bool {
@@ -153,7 +152,7 @@ func printWrappers(output io.Writer, file *File, wrappedStructs []*Struct, struc
 
 func printWrapper(output io.Writer, st *Struct, structs StructStore) {
 	nameParts := strings.Split(st.Name, ".")
-	interfaceName := nameParts[len(nameParts) - 1]
+	interfaceName := nameParts[len(nameParts)-1]
 
 	_, _ = fmt.Fprintf(output, "type %s interface {\n", interfaceName)
 	for _, m := range st.PublicMethods {
@@ -213,7 +212,7 @@ func printWrapper(output io.Writer, st *Struct, structs StructStore) {
 //	}
 //}
 
-func Parse(dirs... string) StructStore {
+func Parse(dirs ...string) StructStore {
 	structs := StructStore{}
 
 	// Structs
@@ -272,10 +271,10 @@ func parseMethodsFromFile(fset *token.FileSet, filepath string, directory string
 }
 
 func newImport(imp *ast.ImportSpec) (string, *Import) {
-	path := imp.Path.Value[1:len(imp.Path.Value) - 1]
+	path := imp.Path.Value[1 : len(imp.Path.Value)-1]
 	parts := strings.Split(path, "/")
 
-	newImport := &Import{Path: path, ImplicitName: parts[len(parts) - 1]}
+	newImport := &Import{Path: path, ImplicitName: parts[len(parts)-1]}
 	if imp.Name != nil {
 		newImport.ExplicitName = imp.Name.Name
 		return newImport.ExplicitName, newImport
@@ -296,7 +295,7 @@ func parseStructsFromFile(fset *token.FileSet, filepath string, directory string
 		panic(err)
 	}
 
-	fillStructs(f, directory, structs, &File{Path:filepath, Imports: createImportStore(f), Package:getPkg(directory)})
+	fillStructs(f, directory, structs, &File{Path: filepath, Imports: createImportStore(f), Package: getPkg(directory)})
 }
 
 func fillMethods(node ast.Node, directory string, structs StructStore, store ImportStore) {
@@ -323,7 +322,7 @@ func getPkg(directory string) *packages.Package {
 	pkgs, err := packages.Load(nil, fullPath)
 	if err != nil {
 		panic(err)
-	} else if (len(pkgs) != 1) {
+	} else if len(pkgs) != 1 {
 		panic(fmt.Sprintf("found multiple packages for directory: %s", directory))
 	}
 	return pkgs[0]
@@ -344,18 +343,18 @@ func fillStructs(node ast.Node, directory string, structs StructStore, file *Fil
 
 func newStruct(v *ast.TypeSpec, file *File) *Struct {
 	return &Struct{
-		File: file,
-		Name: v.Name.Name,
-		FullName: fullTypeName(file.Package, v.Name.Name),
+		File:          file,
+		Name:          v.Name.Name,
+		FullName:      fullTypeName(file.Package, v.Name.Name),
 		PublicMethods: []Method{},
 	}
 }
 
 func newMethod(v *ast.FuncDecl, structs StructStore, pkg *packages.Package, imports ImportStore) Method {
 	return Method{
-		Name: v.Name.Name,
-		Receiver: maybeNewReceiver(v, structs, pkg),
-		Params: getParams(v, structs, pkg, imports),
+		Name:       v.Name.Name,
+		Receiver:   maybeNewReceiver(v, structs, pkg),
+		Params:     getParams(v, structs, pkg, imports),
 		ReturnType: getReturnParams(v, structs, pkg, imports),
 	}
 }
@@ -369,7 +368,7 @@ func getReturnParams(v *ast.FuncDecl, structs StructStore, pkg *packages.Package
 				params = append(params, Param{Name: pn.Name, IsPtr: isPtr, TypeName: typeName, FullTypeName: fullTypeName})
 			}
 		} else {
-			params = append(params, Param{IsPtr:isPtr, TypeName: typeName, FullTypeName:typeName})
+			params = append(params, Param{IsPtr: isPtr, TypeName: typeName, FullTypeName: typeName})
 		}
 	}
 	return params
@@ -393,7 +392,7 @@ func getTypeName(exp ast.Expr, structs StructStore, pkg *packages.Package, impor
 	switch xv := exp.(type) {
 	case *ast.StarExpr:
 		isPtr = true
-		fullName =  xv.X.(*ast.Ident).Name
+		fullName = xv.X.(*ast.Ident).Name
 		name = fullName
 	case *ast.Ident:
 		isPtr = false
@@ -419,16 +418,15 @@ func getTypeName(exp ast.Expr, structs StructStore, pkg *packages.Package, impor
 	return fullName, name, isPtr
 }
 
-
 func maybeNewReceiver(fn *ast.FuncDecl, structs StructStore, pkg *packages.Package) *Param {
 	var rec *Param
 
 	for _, f := range fn.Recv.List {
 		fullTypeName, typeName, isPtr := getTypeName(f.Type, structs, pkg, nil)
 		rec = &Param{
-			Name: f.Names[0].Name,
-			IsPtr: isPtr,
-			TypeName: typeName,
+			Name:         f.Names[0].Name,
+			IsPtr:        isPtr,
+			TypeName:     typeName,
 			FullTypeName: fullTypeName,
 		}
 		break
