@@ -1,19 +1,25 @@
 package a
 
-import (
-	orig_a "github.com/alexodle/go-by-example/destructor/testdata/input/a"
-	orig_ab "github.com/alexodle/go-by-example/destructor/testdata/input/a/ab"
-)
+import ab "github.com/alexodle/go-by-example/destructor/testdata/actualoutput/a/ab"
+import orig_a "github.com/alexodle/go-by-example/destructor/testdata/input/a"
 
 type A interface {
 	GetImpl() *orig_a.A
 	GetV1() string
 	SetV1(v string)
-	F1(a2 A, b orig_ab.AB, c orig_a.ANoMethods, d string) (*string, error)
+	F1(a2 A, b *ab.AB, c orig_a.ANoMethods, d string) (*string, error)
+}
+
+func NewA(impl *orig_a.A) A {
+	return &aWrapper{impl: impl}
 }
 
 type aWrapper struct {
 	impl *orig_a.A
+}
+
+func (o *aWrapper) GetImpl() *orig_a.A {
+	return o.impl
 }
 
 func (o *aWrapper) GetV1() string {
@@ -24,6 +30,6 @@ func (o *aWrapper) SetV1(v string) {
 	o.impl.V1 = v
 }
 
-func (o *aWrapper) F1(a2 A, b orig_ab.AB, c orig_a.ANoMethods, d string) (*string, error) {
-	return o.impl.F1(*a2.GetImpl(), b, c, d)
+func (o *aWrapper) F1(a2 A, b *ab.AB, c orig_a.ANoMethods, d string) (*string, error) {
+	return o.impl.F1(*a2.GetImpl(), b.GetImpl(), c, d)
 }

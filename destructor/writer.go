@@ -4,13 +4,22 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 )
 
 func WriteCode(files []*File) {
 	for _, f := range files {
 		writeFile(f)
+	}
+	for _, f := range files {
+		cmd := exec.Command("go", "fmt", f.Path)
+		_, err := cmd.CombinedOutput()
+		if err != nil {
+			panic(err)
+		}
 	}
 }
 
@@ -34,8 +43,13 @@ func writeFile(f *File) {
 }
 
 func writeImports(w io.Writer, imps ImportStore) {
-	for name, imp := range imps {
-		printf(w, "import %s \"%s\"\n", name, imp.Path)
+	var impStrs []string
+	for _, imp := range imps {
+		impStrs = append(impStrs, fmt.Sprintf("import %s \"%s\"\n", imp.ExplicitName, imp.Path))
+	}
+	sort.Strings(impStrs)
+	for _, s := range impStrs {
+		printf(w, s)
 	}
 }
 

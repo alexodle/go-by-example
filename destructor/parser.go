@@ -208,19 +208,15 @@ func getParams(v *ast.FuncDecl, structs StructStore, pkg *Package, imports Impor
 func getTypeName(exp ast.Expr, structs StructStore, pkg *Package, imports ImportStore) (string, string, bool) {
 	var fullName string
 	var name string
-	var isPtr bool
 	switch xv := exp.(type) {
-	case *ast.StarExpr:
-		isPtr = true
-		fullName =  xv.X.(*ast.Ident).Name
-		name = fullName
 	case *ast.Ident:
-		isPtr = false
 		fullName = xv.Name
 		name = fullName
+	case *ast.StarExpr:
+		fullName, name, _ := getTypeName(xv.X, structs, pkg, imports)
+		return fullName, name, true
 	case *ast.SelectorExpr:
-		pkgName, _, isPtrr := getTypeName(xv.X, structs, pkg, imports)
-		isPtr = isPtrr
+		pkgName, _, _ := getTypeName(xv.X, structs, pkg, imports)
 		fullName = pkgName + "." + xv.Sel.Name
 		name = fullName
 		if imp, ok := imports[pkgName]; ok {
@@ -235,7 +231,7 @@ func getTypeName(exp ast.Expr, structs StructStore, pkg *Package, imports Import
 		fullName = potentialFullName
 	}
 
-	return fullName, name, isPtr
+	return fullName, name, false
 }
 
 

@@ -16,7 +16,7 @@ func (a *A) f1(b, c string) (string, error) {
 	return "", nil
 }
 
-func (a *A) F1(a2 A, b ab.AB, c ANoMethods, d string) (*string, error) {
+func (a *A) F1(a2 A, b *ab.AB, c ANoMethods, d string) (*string, error) {
 	s := ""
 	return &s, nil
 }
