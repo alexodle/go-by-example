@@ -7,6 +7,7 @@ import (
 
 type Animals struct {
 	Locations []Location
+	*AnimalDescription
 }
 
 func (a *Animals) GetAllDogs(ctx context.Context) []*dog.Dog {

@@ -159,11 +159,15 @@ func newFields(v *ast.StructType, structs StructStore, pkg *Package, imports Imp
 	var fields ParamsList
 	if v.Fields != nil {
 		for _, f := range v.Fields.List {
-			for _, pn := range f.Names {
-				if isPublic(pn.Name) {
-					t := getTypeName(f.Type, structs, pkg, imports)
-					fields = append(fields, &Param{Name: pn.Name, Type: t})
+			t := getTypeName(f.Type, structs, pkg, imports)
+			if f.Names != nil {
+				for _, pn := range f.Names {
+					if isPublic(pn.Name) {
+						fields = append(fields, &Param{Name: pn.Name, Type: t})
+					}
 				}
+			} else if isPublic(t.Name) {
+				fields = append(fields, &Param{Name: t.Name, Type: t})
 			}
 		}
 	}

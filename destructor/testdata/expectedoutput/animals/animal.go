@@ -8,6 +8,8 @@ type Animals interface {
 	GetImpl() *orig_animals.Animals
 	GetLocations() []orig_animals.Location
 	SetLocations(v []orig_animals.Location)
+	GetAnimalDescription() *orig_animals.AnimalDescription
+	SetAnimalDescription(v *orig_animals.AnimalDescription)
 	GetAllDogs(ctx orig_context.Context) []dog.Dog
 	GetDogsByNames(names []string) map[string]dog.Dog
 	GetDogByName(name string) dog.Dog
@@ -32,6 +34,15 @@ func (o *animalsWrapper) GetLocations() []orig_animals.Location {
 
 func (o *animalsWrapper) SetLocations(v []orig_animals.Location) {
 	o.impl.Locations = v
+}
+
+func (o *animalsWrapper) GetAnimalDescription() *orig_animals.AnimalDescription {
+	v0 := o.impl.AnimalDescription
+	return v0
+}
+
+func (o *animalsWrapper) SetAnimalDescription(v *orig_animals.AnimalDescription) {
+	o.impl.AnimalDescription = v
 }
 
 func (o *animalsWrapper) GetAllDogs(ctx orig_context.Context) []dog.Dog {
