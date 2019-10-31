@@ -32,6 +32,7 @@ func writeFile(f *File) {
 	if err != nil {
 		panic(err)
 	}
+	fmt.Printf("Writing new file: %s\n", fullPath)
 	if err := os.MkdirAll(filepath.Dir(fullPath), os.ModePerm); err != nil {
 		panic(err)
 	}
