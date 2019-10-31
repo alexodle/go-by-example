@@ -162,7 +162,8 @@ func (m *modeler) convertTypesForFile(f *File, params ParamsList) (ParamsList, I
 }
 
 func (m *modeler) convertMapTypeForFile(f *File, t *Type) (*Type, ImportStore, *Interface) {
-	var newType = *t // shallow copy
+	// shallow copy
+	var newType = *t
 	newType.OriginalType = t
 
 	keyType, imports1, key_iface := m.convertTypeForFile(f, t.MapKeyType)
@@ -187,6 +188,8 @@ func (m *modeler) convertTypeForFile(f *File, t *Type) (*Type, ImportStore, *Int
 		return t, ImportStore{}, nil
 	}
 
+	imports := ImportStore{}
+
 	var newType = *t // shallow copy
 	newType.OriginalType = t
 	newType.FullName = ""
@@ -195,6 +198,9 @@ func (m *modeler) convertTypeForFile(f *File, t *Type) (*Type, ImportStore, *Int
 	fullTypeName := t.FullName
 	prefix := "orig_"
 	if wrapper, ok := m.wrapperStore[fullTypeName]; ok {
+		newType.OriginalType.Name = "orig_" + newType.OriginalType.Name
+		addImportByFullName(newType.OriginalType.FullName, imports, "orig_")
+
 		if newType.IsArray {
 			newType.IsArrayTypePtr = false
 		} else {
@@ -203,24 +209,38 @@ func (m *modeler) convertTypeForFile(f *File, t *Type) (*Type, ImportStore, *Int
 
 		if wrapper.File.Package.Path == f.Package.Path {
 			newType.Name = wrapper.Name
-			return &newType, ImportStore{}, wrapper
+			return &newType, imports, wrapper
 		}
+
 		iface = wrapper
 		prefix = ""
 		fullTypeName = wrapper.FullName
 	}
 
 	parts := strings.Split(fullTypeName, "/")
-	typeNameStr := parts[len(parts)-1]
-	importName := strings.Split(typeNameStr, ".")[0]
+	newType.Name = prefix + parts[len(parts)-1]
+	addImportByFullName(fullTypeName, imports, prefix)
+	return &newType, imports, iface
+}
 
-	importPath := importName
-	if len(parts[:len(parts)-1]) > 0 {
-		importPath = strings.Join(parts[:len(parts)-1], "/") + "/" + importPath
+func addImportByFullName(tn string, imports ImportStore, namePrefix string) {
+	name, path, ok := extractImportFromFullPath(tn)
+	if !ok {
+		panic(fmt.Errorf("failed to parse fullname: %s", tn))
+	}
+	imports[namePrefix+name] = &Import{ExplicitName: namePrefix + name, Path: path}
+}
+
+func extractImportFromFullPath(tn string) (string, string, bool) {
+	slashSplits := strings.Split(tn, "/")
+	nameParts := slashSplits[len(slashSplits)-1]
+	typeName := strings.Split(nameParts, ".")
+	if len(typeName) > 1 {
+		importPath := strings.TrimSuffix(tn, "."+typeName[1])
+		return typeName[0], importPath, true
 	}
 
-	newType.Name = prefix + typeNameStr
-	return &newType, ImportStore{prefix + importName: {ExplicitName: prefix + importName, Path: importPath}}, iface
+	return "", "", false
 }
 
 func isUnsupportedType(t *Type) bool {

@@ -99,52 +99,27 @@ func writeWrapperStruct(w io.Writer, iface *Interface) {
 	for _, method := range iface.WrapperStruct.PublicMethods {
 		if method.ReturnType != nil {
 			printf(w, "func (o *%s) %s(%s) (%s) {\n", iface.WrapperStruct.Name, method.Name, formatParams(method.Params), formatParams(method.ReturnType))
-			writeFunctionImpl(w, method)
 		} else {
 			printf(w, "func (o *%s) %s(%s) {\n", iface.WrapperStruct.Name, method.Name, formatParams(method.Params))
-			if method.IsFieldSetter {
-				printf(w, "\to.impl.%s = %s\n", method.Field.Name, formatParamsCall(method.Params))
-			} else {
-				printf(w, "\to.impl.%s(%s)\n", method.Name, formatParamsCall(method.Params))
-			}
 		}
+
+		newVarNames := unwrapParams(w, method.Params)
+		returnVarNames := applyToImpl(w, method, newVarNames)
+		if len(method.ReturnType) > 0 {
+			returnVarNames = wrapParams(w, method, returnVarNames)
+			printf(w, "\treturn %s\n", strings.Join(returnVarNames, ", "))
+		}
+
 		printf(w, "}\n\n")
 	}
 }
 
-func formatParamsCall(params ParamsList) string {
-	var strs []string
-	for _, p := range params {
-		if p.Interface != nil {
-			if p.Type.OriginalType.IsPtr {
-				strs = append(strs, fmt.Sprintf("%s.GetImpl()", p.Name))
-			} else {
-				strs = append(strs, fmt.Sprintf("*%s.GetImpl()", p.Name))
-			}
-		} else {
-			strs = append(strs, p.Name)
-		}
-	}
-	return strings.Join(strs, ", ")
-}
-
-func writeFunctionImpl(w io.Writer, method *Method) {
-	var localVarNames []string
-	for i, _ := range method.ReturnType {
-		localVarNames = append(localVarNames, fmt.Sprintf("v%d", i))
-	}
-
-	if method.IsFieldGetter {
-		printf(w, "\t%s := o.impl.%s\n", strings.Join(localVarNames, ", "), method.Field.Name)
-	} else {
-		printf(w, "\t%s := o.impl.%s(%s)\n", strings.Join(localVarNames, ", "), method.Name, formatParamsCall(method.Params))
-	}
-
+func wrapParams(w io.Writer, method *Method, varNames []string) []string {
 	for i, p := range method.ReturnType {
 		if p.Interface != nil {
-			oldVarName := localVarNames[i]
+			oldVarName := varNames[i]
 			newVarName := fmt.Sprintf("newv%d", i)
-			localVarNames[i] = newVarName
+			varNames[i] = newVarName
 			toPtr := ""
 
 			if p.Type.IsMap {
@@ -181,8 +156,67 @@ func writeFunctionImpl(w io.Writer, method *Method) {
 			}
 		}
 	}
+	return varNames
+}
 
-	printf(w, "\treturn %s\n", strings.Join(localVarNames, ", "))
+func applyToImpl(w io.Writer, method *Method, varNames []string) []string {
+	if method.IsFieldSetter {
+		printf(w, "\to.impl.%s = %s\n", method.Field.Name, varNames[0])
+		return nil
+	} else if method.IsFieldGetter {
+		printf(w, "\tv0 := o.impl.%s\n", method.Field.Name)
+		return []string{"v0"}
+	} else if method.ReturnType != nil {
+		var newVarNames []string
+		for i, _ := range method.ReturnType {
+			newVarNames = append(newVarNames, fmt.Sprintf("v%d", i))
+		}
+		printf(w, "\t%s := o.impl.%s(%s)\n", strings.Join(newVarNames, ", "), method.Name, strings.Join(varNames, ", "))
+		return newVarNames
+	}
+	printf(w, "\to.impl.%s(%s)\n", method.Name, strings.Join(varNames, ", "))
+	return nil
+}
+
+func unwrapParams(w io.Writer, params ParamsList) []string {
+	var unwrappedVarNames []string
+	for _, p := range params {
+		unwrappedVarNames = append(unwrappedVarNames, p.Name)
+	}
+	for i, p := range params {
+		if p.Interface != nil {
+			oldVarName := unwrappedVarNames[i]
+			newVarName := fmt.Sprintf("new%s", oldVarName)
+			unwrappedVarNames[i] = newVarName
+			deref := ""
+
+			if p.Type.IsMap {
+				if !p.Type.MapValueType.OriginalType.IsPtr {
+					deref = "*"
+				}
+				printf(w, "\tvar %s %s\n", newVarName, formatType(p.Type.OriginalType))
+				printf(w, "\tfor k, v := range %s {\n", oldVarName)
+				printf(w, "\t\t%s[k] = %sv.GetImpl()\n", newVarName, deref)
+				printf(w, "\t}\n")
+			} else {
+				if p.Type.IsArray {
+					if !p.Type.OriginalType.IsArrayTypePtr {
+						deref = "*"
+					}
+					printf(w, "\tvar %s %s\n", newVarName, formatType(p.Type.OriginalType))
+					printf(w, "\tfor _, v := range %s {\n", oldVarName)
+					printf(w, "\t\t%s = append(%s, %sv.GetImpl())\n", newVarName, newVarName, deref)
+					printf(w, "\t}\n")
+				} else {
+					if !p.Type.OriginalType.IsPtr {
+						deref = "*"
+					}
+					printf(w, "\t%s := %s%s.GetImpl()\n", newVarName, deref, oldVarName)
+				}
+			}
+		}
+	}
+	return unwrappedVarNames
 }
 
 func formatParams(params ParamsList) string {

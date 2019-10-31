@@ -26,6 +26,10 @@ func (a *Animals) AddAnimals(animals *[]interface{}) error {
 	return nil
 }
 
+func (a *Animals) AddDogs(dogs []dog.Dog) map[string]Animals {
+	return nil
+}
+
 type AnimalDescription struct {
 	Breed string
 	Name string
