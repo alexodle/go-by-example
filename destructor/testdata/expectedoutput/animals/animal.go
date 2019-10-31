@@ -3,6 +3,7 @@ package animals
 import dog "github.com/alexodle/go-by-example/destructor/testdata/actualoutput/animals/dog"
 import orig_animals "github.com/alexodle/go-by-example/destructor/testdata/input/animals"
 import orig_context "context"
+import orig_dog "github.com/alexodle/go-by-example/destructor/testdata/input/animals/dog"
 
 type Animals interface {
 	GetImpl() *orig_animals.Animals
@@ -14,6 +15,7 @@ type Animals interface {
 	GetDogsByNames(names []string) map[string]dog.Dog
 	GetDogByName(name string) dog.Dog
 	AddAnimals(animals *[]interface{}) error
+	AddDogs(dogs []dog.Dog) map[string]Animals
 }
 
 func NewAnimals(impl *orig_animals.Animals) Animals {
@@ -44,7 +46,8 @@ func (o *animalsWrapper) GetAnimalDescription() AnimalDescription {
 }
 
 func (o *animalsWrapper) SetAnimalDescription(v AnimalDescription) {
-	o.impl.AnimalDescription = v.GetImpl()
+	newv := v.GetImpl()
+	o.impl.AnimalDescription = newv
 }
 
 func (o *animalsWrapper) GetAllDogs(ctx orig_context.Context) []dog.Dog {
@@ -74,6 +77,19 @@ func (o *animalsWrapper) GetDogByName(name string) dog.Dog {
 func (o *animalsWrapper) AddAnimals(animals *[]interface{}) error {
 	v0 := o.impl.AddAnimals(animals)
 	return v0
+}
+
+func (o *animalsWrapper) AddDogs(dogs []dog.Dog) map[string]Animals {
+	var newdogs []orig_dog.Dog
+	for _, v := range dogs {
+		newdogs = append(newdogs, *v.GetImpl())
+	}
+	v0 := o.impl.AddDogs(newdogs)
+	var newv0 map[string]Animals
+	for k, v := range v0 {
+		newv0[k] = NewAnimals(&v)
+	}
+	return newv0
 }
 
 type AnimalDescription interface {

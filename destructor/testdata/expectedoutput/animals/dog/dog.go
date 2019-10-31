@@ -2,6 +2,7 @@ package dog
 
 import animals "github.com/alexodle/go-by-example/destructor/testdata/actualoutput/animals"
 import food "github.com/alexodle/go-by-example/destructor/testdata/actualoutput/animals/food"
+
 import orig_dog "github.com/alexodle/go-by-example/destructor/testdata/input/animals/dog"
 
 type Dog interface {
@@ -42,7 +43,8 @@ func (o *dogWrapper) Meows() bool {
 }
 
 func (o *dogWrapper) Eat(f food.Food) int {
-	v0 := o.impl.Eat(f.GetImpl())
+	newf := f.GetImpl()
+	v0 := o.impl.Eat(newf)
 	return v0
 }
 

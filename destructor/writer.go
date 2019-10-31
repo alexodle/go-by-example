@@ -20,7 +20,7 @@ func WriteCode(files []*File) {
 			panic(err)
 		}
 		fmt.Printf("Formatting new file: %s\n", fullPath)
-		cmd := exec.Command("go", "fmt", fullPath)
+		cmd := exec.Command("goimports", "-w", fullPath)
 		output, err := cmd.CombinedOutput()
 		if err != nil {
 			panic(fmt.Errorf("gofmt failure: %s", string(output)))

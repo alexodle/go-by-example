@@ -14,7 +14,7 @@ func Test_Generate(t *testing.T) {
 
 	GenerateWrappers("testdata/input", "testdata/actualoutput")
 	defer func() {
-		//_ = os.RemoveAll("testdata/actualoutput")
+		_ = os.RemoveAll("testdata/actualoutput")
 	}()
 	require.NoError(t, filepath.Walk("testdata/expectedoutput", func(path string, info os.FileInfo, err error) error {
 		if info.IsDir() {
