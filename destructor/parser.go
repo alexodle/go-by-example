@@ -231,6 +231,14 @@ func getTypeName(exp ast.Expr, structs StructStore, pkg *Package, imports Import
 			IsArray:        true,
 			IsArrayTypePtr: tn.IsPtr,
 		}
+	case *ast.MapType:
+		ktype := getTypeName(xv.Key, structs, pkg, imports)
+		vtype := getTypeName(xv.Value, structs, pkg, imports)
+		return &Type{
+			IsMap:        true,
+			MapKeyType:   ktype,
+			MapValueType: vtype,
+		}
 	default:
 		panic(fmt.Sprintf("no type found: %T", exp))
 	}

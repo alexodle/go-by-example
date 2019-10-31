@@ -8,6 +8,7 @@ type Animals interface {
 	GetLocations() []orig_animals.Location
 	SetLocations(v []orig_animals.Location)
 	GetAllDogs() []dog.Dog
+	GetDogsByName() map[string]dog.Dog
 }
 
 func NewAnimals(impl *orig_animals.Animals) Animals {
@@ -23,7 +24,8 @@ func (o *animalsWrapper) GetImpl() *orig_animals.Animals {
 }
 
 func (o *animalsWrapper) GetLocations() []orig_animals.Location {
-	return o.impl.Locations
+	v0 := o.impl.Locations
+	return v0
 }
 
 func (o *animalsWrapper) SetLocations(v []orig_animals.Location) {
@@ -31,9 +33,19 @@ func (o *animalsWrapper) SetLocations(v []orig_animals.Location) {
 }
 
 func (o *animalsWrapper) GetAllDogs() []dog.Dog {
-	var arr []dog.Dog
-	for _, v := range o.impl.GetAllDogs() {
-		arr = append(arr, dog.NewDog(v))
+	v0 := o.impl.GetAllDogs()
+	var newv0 []dog.Dog
+	for _, v := range v0 {
+		newv0 = append(newv0, dog.NewDog(v))
 	}
-	return arr
+	return newv0
+}
+
+func (o *animalsWrapper) GetDogsByName() map[string]dog.Dog {
+	v0 := o.impl.GetDogsByName()
+	var newv0 map[string]dog.Dog
+	for k, v := range v0 {
+		newv0[k] = dog.NewDog(v)
+	}
+	return newv0
 }

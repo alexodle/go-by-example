@@ -1,6 +1,7 @@
 package destructor
 
 import (
+	"fmt"
 	"strings"
 )
 
@@ -111,7 +112,7 @@ func (m *modeler) fillWrappers() {
 				},
 			)
 		}
-		mergeImportStores(iface.File.Imports, fieldImps)
+		iface.File.Imports.AddAll(fieldImps)
 
 		for _, method := range iface.OriginalStruct.PublicMethods {
 			params, imps1 := m.convertTypesForFile(iface.File, method.Params)
@@ -127,8 +128,8 @@ func (m *modeler) fillWrappers() {
 				ReturnType: returnType,
 				Receiver:   recvParam,
 			})
-			mergeImportStores(iface.File.Imports, imps1)
-			mergeImportStores(iface.File.Imports, imps2)
+			iface.File.Imports.AddAll(imps1)
+			iface.File.Imports.AddAll(imps2)
 		}
 	}
 }
@@ -137,22 +138,41 @@ func (m *modeler) convertTypesForFile(f *File, params ParamsList) (ParamsList, I
 	var newParams ParamsList
 	importStore := ImportStore{}
 	for _, p := range params {
-		t, imp, iface := m.convertTypeForFile(f, p.Type)
+		t, imps, iface := m.convertTypeForFile(f, p.Type)
 		newParams = append(newParams, &Param{
 			Name:      p.Name,
 			Type:      t,
 			Interface: iface,
 		})
-		if imp != nil {
-			importStore[imp.ExplicitName] = imp
-		}
+		importStore.AddAll(imps)
 	}
 	return newParams, importStore
 }
 
-func (m *modeler) convertTypeForFile(f *File, t *Type) (*Type, *Import, *Interface) {
+func (m *modeler) convertMapTypeForFile(f *File, t *Type) (*Type, ImportStore, *Interface) {
+	var newType = *t // shallow copy
+	newType.OriginalType = t
+
+	keyType, imports1, key_iface := m.convertTypeForFile(f, t.MapKeyType)
+	if key_iface != nil {
+		panic(fmt.Errorf("struct map keys not supported yet: %s", key_iface.OriginalStruct.FullName))
+	}
+	newType.MapKeyType = keyType
+
+	valType, imports2, iface := m.convertTypeForFile(f, t.MapValueType)
+	newType.MapValueType = valType
+
+	imports1.AddAll(imports2)
+	return &newType, imports1, iface
+}
+
+func (m *modeler) convertTypeForFile(f *File, t *Type) (*Type, ImportStore, *Interface) {
+	if t.IsMap {
+		return m.convertMapTypeForFile(f, t)
+	}
+
 	if t.Name == t.FullName {
-		return t, nil, nil
+		return t, ImportStore{}, nil
 	}
 
 	var newType = *t // shallow copy
@@ -171,7 +191,7 @@ func (m *modeler) convertTypeForFile(f *File, t *Type) (*Type, *Import, *Interfa
 
 		if wrapper.File.Package.Path == f.Package.Path {
 			newType.Name = wrapper.Name
-			return &newType, nil, wrapper
+			return &newType, ImportStore{}, wrapper
 		}
 		iface = wrapper
 		prefix = ""
@@ -184,11 +204,5 @@ func (m *modeler) convertTypeForFile(f *File, t *Type) (*Type, *Import, *Interfa
 	importPath := strings.Join(parts[:len(parts)-1], "/") + "/" + importName
 
 	newType.Name = prefix + typeNameStr
-	return &newType, &Import{ExplicitName: prefix + importName, Path: importPath}, iface
-}
-
-func mergeImportStores(a ImportStore, b ImportStore) {
-	for k, b := range b {
-		a[k] = b
-	}
+	return &newType, ImportStore{prefix + importName: {ExplicitName: prefix + importName, Path: importPath}}, iface
 }

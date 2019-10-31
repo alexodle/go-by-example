@@ -20,5 +20,6 @@ func (o *foodWrapper) GetImpl() *orig_food.Food {
 }
 
 func (o *foodWrapper) Brand() string {
-	return o.impl.Brand()
+	v0 := o.impl.Brand()
+	return v0
 }

@@ -63,12 +63,18 @@ type Param struct {
 }
 
 type Type struct {
-	FullName       string
-	Name           string
-	IsPtr          bool
+	FullName string
+	Name     string
+	IsPtr    bool
+
 	IsArray        bool
 	IsArrayTypePtr bool
-	OriginalType   *Type
+
+	IsMap        bool
+	MapKeyType   *Type
+	MapValueType *Type
+
+	OriginalType *Type
 }
 
 func (t *Type) LocalPkgName() string {
@@ -77,4 +83,10 @@ func (t *Type) LocalPkgName() string {
 		return parts[0]
 	}
 	return ""
+}
+
+func (i *ImportStore) AddAll(other ImportStore) {
+	for k, imp := range other {
+		(*i)[k] = imp
+	}
 }
