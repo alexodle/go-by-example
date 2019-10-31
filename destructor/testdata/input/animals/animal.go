@@ -13,8 +13,12 @@ func (a *Animals) GetAllDogs(ctx context.Context) []*dog.Dog {
 	return nil
 }
 
-func (a *Animals) GetDogsByName() map[string]*dog.Dog {
+func (a *Animals) GetDogsByNames(names []string) map[string]*dog.Dog {
 	return nil
+}
+
+func (a *Animals) GetDogByName(name string) dog.Dog {
+	return dog.Dog{}
 }
 
 type AnimalDescription struct {

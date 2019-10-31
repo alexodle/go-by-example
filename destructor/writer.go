@@ -143,15 +143,19 @@ func writeFunctionImpl(w io.Writer, method *Method) {
 			oldVarName := localVarNames[i]
 			newVarName := fmt.Sprintf("newv%d", i)
 			localVarNames[i] = newVarName
+			toPtr := ""
 
 			if p.Type.IsMap {
+				if !p.Type.MapValueType.OriginalType.IsPtr {
+					toPtr = "&"
+				}
 				newFuncName := fmt.Sprintf("New%s", p.Interface.Name)
 				if p.Type.MapValueType.LocalPkgName() != "" {
 					newFuncName = p.Type.MapValueType.LocalPkgName() + "." + newFuncName
 				}
 				printf(w, "\tvar %s %s\n", newVarName, formatType(p.Type))
 				printf(w, "\tfor k, v := range %s {\n", oldVarName)
-				printf(w, "\t\t%s[k] = %s(v)\n", newVarName, newFuncName)
+				printf(w, "\t\t%s[k] = %s(%sv)\n", newVarName, newFuncName, toPtr)
 				printf(w, "\t}\n")
 			} else {
 				newFuncName := fmt.Sprintf("New%s", p.Interface.Name)
@@ -159,12 +163,18 @@ func writeFunctionImpl(w io.Writer, method *Method) {
 					newFuncName = p.Type.LocalPkgName() + "." + newFuncName
 				}
 				if p.Type.IsArray {
+					if !p.Type.OriginalType.IsArrayTypePtr {
+						toPtr = "&"
+					}
 					printf(w, "\tvar %s %s\n", newVarName, formatType(p.Type))
 					printf(w, "\tfor _, v := range %s {\n", oldVarName)
-					printf(w, "\t\t%s = append(%s, %s(v))\n", newVarName, newVarName, newFuncName)
+					printf(w, "\t\t%s = append(%s, %s(%sv))\n", newVarName, newVarName, newFuncName, toPtr)
 					printf(w, "\t}\n")
 				} else {
-					printf(w, "\t%s := %s(%s)\n", newVarName, newFuncName, oldVarName)
+					if !p.Type.OriginalType.IsPtr {
+						toPtr = "&"
+					}
+					printf(w, "\t%s := %s(%s%s)\n", newVarName, newFuncName, toPtr, oldVarName)
 				}
 			}
 		}
