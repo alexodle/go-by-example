@@ -2,12 +2,13 @@ package animals
 
 import dog "github.com/alexodle/go-by-example/destructor/testdata/actualoutput/animals/dog"
 import orig_animals "github.com/alexodle/go-by-example/destructor/testdata/input/animals"
+import orig_context "context"
 
 type Animals interface {
 	GetImpl() *orig_animals.Animals
 	GetLocations() []orig_animals.Location
 	SetLocations(v []orig_animals.Location)
-	GetAllDogs() []dog.Dog
+	GetAllDogs(ctx orig_context.Context) []dog.Dog
 	GetDogsByName() map[string]dog.Dog
 }
 
@@ -32,8 +33,8 @@ func (o *animalsWrapper) SetLocations(v []orig_animals.Location) {
 	o.impl.Locations = v
 }
 
-func (o *animalsWrapper) GetAllDogs() []dog.Dog {
-	v0 := o.impl.GetAllDogs()
+func (o *animalsWrapper) GetAllDogs(ctx orig_context.Context) []dog.Dog {
+	v0 := o.impl.GetAllDogs(ctx)
 	var newv0 []dog.Dog
 	for _, v := range v0 {
 		newv0 = append(newv0, dog.NewDog(v))

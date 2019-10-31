@@ -12,6 +12,10 @@ func (d *Dog) Describe() animals.AnimalDescription {
 	return animals.AnimalDescription{}
 }
 
+// Callback functions not supported yet, should just leave out
+func (d *Dog) OnBark(s1 string, barkHandler func(d *Dog, s string) string) {
+}
+
 func (d *Dog) Barks() bool {
 	return true
 }

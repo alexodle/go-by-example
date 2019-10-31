@@ -159,9 +159,9 @@ func newFields(v *ast.StructType, structs StructStore, pkg *Package, imports Imp
 	var fields ParamsList
 	if v.Fields != nil {
 		for _, f := range v.Fields.List {
-			t := getTypeName(f.Type, structs, pkg, imports)
 			for _, pn := range f.Names {
 				if isPublic(pn.Name) {
+					t := getTypeName(f.Type, structs, pkg, imports)
 					fields = append(fields, &Param{Name: pn.Name, Type: t})
 				}
 			}
@@ -174,14 +174,17 @@ func newMethod(v *ast.FuncDecl, structs StructStore, pkg *Package, imports Impor
 	return &Method{
 		Name:       v.Name.Name,
 		Receiver:   maybeNewReceiver(v, structs, pkg),
-		Params:     getParams(v, structs, pkg, imports),
-		ReturnType: getReturnParams(v, structs, pkg, imports),
+		Params:     getParams(v.Type.Params, structs, pkg, imports),
+		ReturnType: getReturnParams(v.Type.Results, structs, pkg, imports),
 	}
 }
 
-func getReturnParams(v *ast.FuncDecl, structs StructStore, pkg *Package, imports ImportStore) ParamsList {
+func getReturnParams(fieldList *ast.FieldList, structs StructStore, pkg *Package, imports ImportStore) ParamsList {
+	if fieldList == nil {
+		return nil
+	}
 	var params []*Param
-	for _, p := range v.Type.Results.List {
+	for _, p := range fieldList.List {
 		t := getTypeName(p.Type, structs, pkg, imports)
 		if p.Names != nil {
 			for _, pn := range p.Names {
@@ -194,9 +197,12 @@ func getReturnParams(v *ast.FuncDecl, structs StructStore, pkg *Package, imports
 	return params
 }
 
-func getParams(v *ast.FuncDecl, structs StructStore, pkg *Package, imports ImportStore) ParamsList {
+func getParams(fieldList *ast.FieldList, structs StructStore, pkg *Package, imports ImportStore) ParamsList {
+	if fieldList == nil {
+		return nil
+	}
 	var params []*Param
-	for _, p := range v.Type.Params.List {
+	for _, p := range fieldList.List {
 		t := getTypeName(p.Type, structs, pkg, imports)
 		for _, pn := range p.Names {
 			params = append(params, &Param{Name: pn.Name, Type: t})
@@ -239,6 +245,19 @@ func getTypeName(exp ast.Expr, structs StructStore, pkg *Package, imports Import
 			MapKeyType:   ktype,
 			MapValueType: vtype,
 		}
+	case *ast.FuncType:
+		return &Type{
+			IsFunc:         true,
+			FuncParams:     getParams(xv.Params, structs, pkg, imports),
+			FuncReturnType: getReturnParams(xv.Results, structs, pkg, imports),
+		}
+	case *ast.InterfaceType:
+		if xv.Methods != nil && xv.Methods.List != nil && len(xv.Methods.List) > 0 {
+			panic(fmt.Errorf("non-empty interface params not supported"))
+		}
+		return &Type{
+			IsEmptyInterface: true,
+		}
 	default:
 		panic(fmt.Sprintf("no type found: %T", exp))
 	}
@@ -254,13 +273,15 @@ func getTypeName(exp ast.Expr, structs StructStore, pkg *Package, imports Import
 func maybeNewReceiver(fn *ast.FuncDecl, structs StructStore, pkg *Package) *Param {
 	var rec *Param
 
-	for _, f := range fn.Recv.List {
-		t := getTypeName(f.Type, structs, pkg, nil)
-		rec = &Param{
-			Name: f.Names[0].Name,
-			Type: t,
+	if fn.Recv != nil {
+		for _, f := range fn.Recv.List {
+			t := getTypeName(f.Type, structs, pkg, nil)
+			rec = &Param{
+				Name: f.Names[0].Name,
+				Type: t,
+			}
+			break
 		}
-		break
 	}
 
 	return rec

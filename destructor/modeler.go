@@ -83,6 +83,10 @@ func (m *modeler) fillWrappers() {
 
 		fields, fieldImps := m.convertTypesForFile(iface.File, iface.OriginalStruct.Fields)
 		for _, f := range fields {
+			if isUnsupportedType(f.Type) {
+				fmt.Printf("WARN: skipping getter/setter methods for field:%s.%s, at least one param or return type is not currently supported\n", iface.Name, f.Name)
+				continue
+			}
 			setParams := ParamsList{&Param{Name: "v", Type: f.Type}}
 			getReturnType := ParamsList{&Param{Type: f.Type}}
 			iface.Methods = append(iface.Methods,
@@ -115,6 +119,10 @@ func (m *modeler) fillWrappers() {
 		iface.File.Imports.AddAll(fieldImps)
 
 		for _, method := range iface.OriginalStruct.PublicMethods {
+			if isUnsupportedMethod(method) {
+				fmt.Printf("WARN: skipping method:%s.%s, at least one param or return type is not currently supported\n", iface.Name, method.Name)
+				continue
+			}
 			params, imps1 := m.convertTypesForFile(iface.File, method.Params)
 			returnType, imps2 := m.convertTypesForFile(iface.File, method.ReturnType)
 			iface.Methods = append(iface.Methods, &Method{
@@ -171,7 +179,7 @@ func (m *modeler) convertTypeForFile(f *File, t *Type) (*Type, ImportStore, *Int
 		return m.convertMapTypeForFile(f, t)
 	}
 
-	if t.Name == t.FullName {
+	if !strings.Contains(t.FullName, ".") {
 		return t, ImportStore{}, nil
 	}
 
@@ -201,8 +209,29 @@ func (m *modeler) convertTypeForFile(f *File, t *Type) (*Type, ImportStore, *Int
 	parts := strings.Split(fullTypeName, "/")
 	typeNameStr := parts[len(parts)-1]
 	importName := strings.Split(typeNameStr, ".")[0]
-	importPath := strings.Join(parts[:len(parts)-1], "/") + "/" + importName
+
+	importPath := importName
+	if len(parts[:len(parts)-1]) > 0 {
+		importPath = strings.Join(parts[:len(parts)-1], "/") + "/" + importPath
+	}
 
 	newType.Name = prefix + typeNameStr
 	return &newType, ImportStore{prefix + importName: {ExplicitName: prefix + importName, Path: importPath}}, iface
+}
+
+func isUnsupportedType(t *Type) bool {
+	return t.IsFunc
+}
+
+func hasUnsupportedType(params ParamsList) bool {
+	for _, p := range params {
+		if isUnsupportedType(p.Type) {
+			return true
+		}
+	}
+	return false
+}
+
+func isUnsupportedMethod(method *Method) bool {
+	return hasUnsupportedType(method.Params) || hasUnsupportedType(method.ReturnType)
 }

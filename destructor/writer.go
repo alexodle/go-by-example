@@ -15,8 +15,12 @@ func WriteCode(files []*File) {
 		writeFile(f)
 	}
 	for _, f := range files {
-		cmd := exec.Command("go", "fmt", f.Path)
-		_, err := cmd.CombinedOutput()
+		fullPath, err := filepath.Abs(f.Path)
+		if err != nil {
+			panic(err)
+		}
+		cmd := exec.Command("go", "fmt", fullPath)
+		_, err = cmd.CombinedOutput()
 		if err != nil {
 			panic(err)
 		}
@@ -24,14 +28,23 @@ func WriteCode(files []*File) {
 }
 
 func writeFile(f *File) {
-	if err := os.MkdirAll(filepath.Dir(f.Path), os.ModePerm); err != nil {
-		panic(err)
-	}
-	w, err := os.Create(f.Path)
+	fullPath, err := filepath.Abs(f.Path)
 	if err != nil {
 		panic(err)
 	}
-	defer func() { _ = w.Close() }()
+	if err := os.MkdirAll(filepath.Dir(fullPath), os.ModePerm); err != nil {
+		panic(err)
+	}
+	w, err := os.Create(fullPath)
+	if err != nil {
+		panic(err)
+	}
+	defer func() {
+		err = w.Close()
+		if err != nil {
+			panic(err)
+		}
+	}()
 
 	printf(w, "package %s\n\n", f.Package.Name)
 
@@ -189,7 +202,11 @@ func formatType(t *Type) string {
 		parts = append(parts, "]")
 		parts = append(parts, formatType(t.MapValueType))
 		return strings.Join(parts, "")
+	} else if t.IsEmptyInterface {
+		parts = append(parts, "interface{}")
+		return strings.Join(parts, "")
 	}
+
 	parts = append(parts, t.Name)
 	return strings.Join(parts, "")
 }

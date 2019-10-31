@@ -62,6 +62,7 @@ type Param struct {
 	Interface *Interface
 }
 
+// TODO: refactor
 type Type struct {
 	FullName string
 	Name     string
@@ -73,6 +74,12 @@ type Type struct {
 	IsMap        bool
 	MapKeyType   *Type
 	MapValueType *Type
+
+	IsFunc         bool
+	FuncParams     ParamsList
+	FuncReturnType ParamsList
+
+	IsEmptyInterface bool
 
 	OriginalType *Type
 }

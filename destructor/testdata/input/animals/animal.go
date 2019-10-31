@@ -1,12 +1,15 @@
 package animals
 
-import "github.com/alexodle/go-by-example/destructor/testdata/input/animals/dog"
+import (
+	"context"
+	"github.com/alexodle/go-by-example/destructor/testdata/input/animals/dog"
+)
 
 type Animals struct {
 	Locations []Location
 }
 
-func (a *Animals) GetAllDogs() []*dog.Dog {
+func (a *Animals) GetAllDogs(ctx context.Context) []*dog.Dog {
 	return nil
 }
 
