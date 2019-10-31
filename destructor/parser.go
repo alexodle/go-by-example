@@ -260,7 +260,8 @@ func getTypeName(exp ast.Expr, structs StructStore, pkg *Package, imports Import
 			panic(fmt.Errorf("non-empty interface params not supported"))
 		}
 		return &Type{
-			IsEmptyInterface: true,
+			Name:     "interface{}",
+			FullName: "interface{}",
 		}
 	default:
 		panic(fmt.Sprintf("no type found: %T", exp))

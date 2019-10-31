@@ -30,7 +30,7 @@ type modeler struct {
 }
 
 func shouldWrap(st *Struct) bool {
-	return len(st.PublicMethods) > 0
+	return len(st.PublicMethods) > 0 || len(st.Fields) > 0
 }
 
 func (m *modeler) buildWrappers() {
@@ -82,13 +82,15 @@ func (m *modeler) fillWrappers() {
 		}
 
 		fields, fieldImps := m.convertTypesForFile(iface.File, iface.OriginalStruct.Fields)
+		iface.File.Imports.AddAll(fieldImps)
+
 		for _, f := range fields {
 			if isUnsupportedType(f.Type) {
 				fmt.Printf("WARN: skipping getter/setter methods for field:%s.%s, at least one param or return type is not currently supported\n", iface.Name, f.Name)
 				continue
 			}
-			setParams := ParamsList{&Param{Name: "v", Type: f.Type}}
-			getReturnType := ParamsList{&Param{Type: f.Type}}
+			setParams := ParamsList{&Param{Name: "v", Type: f.Type, Interface: f.Interface}}
+			getReturnType := ParamsList{&Param{Type: f.Type, Interface: f.Interface}}
 			iface.Methods = append(iface.Methods,
 				&Method{
 					Name:       "Get" + f.Name,
@@ -116,15 +118,19 @@ func (m *modeler) fillWrappers() {
 				},
 			)
 		}
-		iface.File.Imports.AddAll(fieldImps)
 
 		for _, method := range iface.OriginalStruct.PublicMethods {
 			if isUnsupportedMethod(method) {
 				fmt.Printf("WARN: skipping method:%s.%s, at least one param or return type is not currently supported\n", iface.Name, method.Name)
 				continue
 			}
+
 			params, imps1 := m.convertTypesForFile(iface.File, method.Params)
+			iface.File.Imports.AddAll(imps1)
+
 			returnType, imps2 := m.convertTypesForFile(iface.File, method.ReturnType)
+			iface.File.Imports.AddAll(imps2)
+
 			iface.Methods = append(iface.Methods, &Method{
 				Name:       method.Name,
 				Params:     params,
@@ -136,8 +142,6 @@ func (m *modeler) fillWrappers() {
 				ReturnType: returnType,
 				Receiver:   recvParam,
 			})
-			iface.File.Imports.AddAll(imps1)
-			iface.File.Imports.AddAll(imps2)
 		}
 	}
 }

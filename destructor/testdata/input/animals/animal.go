@@ -22,6 +22,10 @@ func (a *Animals) GetDogByName(name string) dog.Dog {
 	return dog.Dog{}
 }
 
+func (a *Animals) AddAnimals(animals *[]interface{}) error {
+	return nil
+}
+
 type AnimalDescription struct {
 	Breed string
 	Name string

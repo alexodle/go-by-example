@@ -19,10 +19,11 @@ func WriteCode(files []*File) {
 		if err != nil {
 			panic(err)
 		}
+		fmt.Printf("Formatting new file: %s\n", fullPath)
 		cmd := exec.Command("go", "fmt", fullPath)
-		_, err = cmd.CombinedOutput()
+		output, err := cmd.CombinedOutput()
 		if err != nil {
-			panic(err)
+			panic(fmt.Errorf("gofmt failure: %s", string(output)))
 		}
 	}
 }
@@ -102,7 +103,7 @@ func writeWrapperStruct(w io.Writer, iface *Interface) {
 		} else {
 			printf(w, "func (o *%s) %s(%s) {\n", iface.WrapperStruct.Name, method.Name, formatParams(method.Params))
 			if method.IsFieldSetter {
-				printf(w, "\to.impl.%s = %s\n", method.Field.Name, method.Params[0].Name)
+				printf(w, "\to.impl.%s = %s\n", method.Field.Name, formatParamsCall(method.Params))
 			} else {
 				printf(w, "\to.impl.%s(%s)\n", method.Name, formatParamsCall(method.Params))
 			}
@@ -207,14 +208,12 @@ func formatType(t *Type) string {
 		if t.IsArrayTypePtr {
 			parts = append(parts, "*")
 		}
-	} else if t.IsMap {
+	}
+	if t.IsMap {
 		parts = append(parts, "map[")
 		parts = append(parts, formatType(t.MapKeyType))
 		parts = append(parts, "]")
 		parts = append(parts, formatType(t.MapValueType))
-		return strings.Join(parts, "")
-	} else if t.IsEmptyInterface {
-		parts = append(parts, "interface{}")
 		return strings.Join(parts, "")
 	}
 

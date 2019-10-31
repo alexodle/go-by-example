@@ -79,8 +79,6 @@ type Type struct {
 	FuncParams     ParamsList
 	FuncReturnType ParamsList
 
-	IsEmptyInterface bool
-
 	OriginalType *Type
 }
 
