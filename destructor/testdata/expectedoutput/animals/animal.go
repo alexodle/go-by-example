@@ -9,6 +9,10 @@ type Animals interface {
 	GetImpl() *orig_animals.Animals
 	GetLocations() []orig_animals.Location
 	SetLocations(v []orig_animals.Location)
+	GetDogs() *[]dog.Dog
+	SetDogs(v *[]dog.Dog)
+	GetDogsByNameField() *map[string]dog.Dog
+	SetDogsByNameField(v *map[string]dog.Dog)
 	GetAnimalDescription() AnimalDescription
 	SetAnimalDescription(v AnimalDescription)
 	GetAllDogs(ctx orig_context.Context) []dog.Dog
@@ -39,6 +43,50 @@ func (o *animalsWrapper) SetLocations(v []orig_animals.Location) {
 	o.impl.Locations = v
 }
 
+func (o *animalsWrapper) GetDogs() *[]dog.Dog {
+	v0 := o.impl.Dogs
+	var newv0 *[]dog.Dog
+	if v0 != nil {
+		for _, v := range *v0 {
+			*newv0 = append(*newv0, dog.NewDog(&v))
+		}
+	}
+	return newv0
+}
+
+func (o *animalsWrapper) SetDogs(v *[]dog.Dog) {
+	var newv *[]orig_dog.Dog
+	if v != nil {
+		for _, v := range *v {
+			*newv = append(*newv, *v.GetImpl())
+		}
+	}
+	o.impl.Dogs = newv
+}
+
+func (o *animalsWrapper) GetDogsByNameField() *map[string]dog.Dog {
+	v0 := o.impl.DogsByNameField
+	var newv0 *map[string]dog.Dog
+	if v0 != nil {
+		newv0 = &map[string]dog.Dog{}
+		for k, v := range *v0 {
+			(*newv0)[k] = dog.NewDog(&v)
+		}
+	}
+	return newv0
+}
+
+func (o *animalsWrapper) SetDogsByNameField(v *map[string]dog.Dog) {
+	var newv *map[string]orig_dog.Dog
+	if v != nil {
+		newv = &map[string]orig_dog.Dog{}
+		for k, v := range *v {
+			(*newv)[k] = *v.GetImpl()
+		}
+	}
+	o.impl.DogsByNameField = newv
+}
+
 func (o *animalsWrapper) GetAnimalDescription() AnimalDescription {
 	v0 := o.impl.AnimalDescription
 	newv0 := NewAnimalDescription(v0)
@@ -62,6 +110,7 @@ func (o *animalsWrapper) GetAllDogs(ctx orig_context.Context) []dog.Dog {
 func (o *animalsWrapper) GetDogsByNames(names []string) map[string]dog.Dog {
 	v0 := o.impl.GetDogsByNames(names)
 	var newv0 map[string]dog.Dog
+	newv0 = map[string]dog.Dog{}
 	for k, v := range v0 {
 		newv0[k] = dog.NewDog(v)
 	}
@@ -86,6 +135,7 @@ func (o *animalsWrapper) AddDogs(dogs []dog.Dog) map[string]Animals {
 	}
 	v0 := o.impl.AddDogs(newdogs)
 	var newv0 map[string]Animals
+	newv0 = map[string]Animals{}
 	for k, v := range v0 {
 		newv0[k] = NewAnimals(&v)
 	}
