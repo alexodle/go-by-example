@@ -119,12 +119,12 @@ func applyToImpl(w io.Writer, method *Method, varNames []string) []string {
 		printf(w, "o.impl.%s = %s\n", method.Field.Name, varNames[0])
 		return nil
 	} else if method.IsFieldGetter {
-		printf(w, "v0 := o.impl.%s\n", method.Field.Name)
-		return []string{"v0"}
+		printf(w, "retval := o.impl.%s\n", method.Field.Name)
+		return []string{"retval"}
 	} else if method.ReturnType != nil {
 		var newVarNames []string
 		for i, _ := range method.ReturnType {
-			newVarNames = append(newVarNames, fmt.Sprintf("v%d", i))
+			newVarNames = append(newVarNames, fmt.Sprintf("retval%d", i))
 		}
 		printf(w, "%s := o.impl.%s(%s)\n", strings.Join(newVarNames, ", "), method.Name, strings.Join(varNames, ", "))
 		return newVarNames
@@ -133,121 +133,35 @@ func applyToImpl(w io.Writer, method *Method, varNames []string) []string {
 	return nil
 }
 
-func wrapArrayParam(w io.Writer, oldVarName, newVarName string, p *Param) {
-	refItem := ""
-	derefArray := ""
-
-	newFuncName := fmt.Sprintf("New%s", p.Interface.Name)
-	if p.Type.LocalPkgName() != "" {
-		newFuncName = p.Type.LocalPkgName() + "." + newFuncName
-	}
-
-	wrap := func() {
-		printf(w, "for _, v := range %s%s {\n", derefArray, oldVarName)
-		printf(w, "%s%s = append(%s%s, %s(%sv))\n", derefArray, newVarName, derefArray, newVarName, newFuncName, refItem)
-		printf(w, "}\n")
-	}
-
-	printf(w, "var %s %s\n", newVarName, formatType(p.Type))
-
-	if !p.Type.OriginalType.IsArrayTypePtr {
-		refItem = "&"
-	}
-
-	if p.Type.IsPtr {
-		derefArray = "*"
-		printf(w, "if %s != nil {\n", oldVarName)
-		wrap()
-		printf(w, "}\n")
+func getVarNames(varBaseName string, i int) (string, string) {
+	var oldVarName string
+	if i == 0 {
+		oldVarName = varBaseName
 	} else {
-		wrap()
+		oldVarName = fmt.Sprintf("%s_%d", varBaseName, i)
 	}
+	newVarName := fmt.Sprintf("%s_%d", varBaseName, i+1)
+	return oldVarName, newVarName
 }
 
-func wrapMapParam(w io.Writer, oldVarName, newVarName string, p *Param) {
-	toPtrItem := ""
-	derefMap := ""
-	refMap := ""
-
-	newFuncName := fmt.Sprintf("New%s", p.Interface.Name)
-	if p.Type.MapValueType.LocalPkgName() != "" {
-		newFuncName = p.Type.MapValueType.LocalPkgName() + "." + newFuncName
-	}
-
-	wrap := func() {
-		printf(w, "%s = %s%s{}\n", newVarName, refMap, formatTypeWithoutLeadingPtr(p.Type))
-		printf(w, "for k, v := range %s%s {\n", derefMap, oldVarName)
-		if derefMap != "" {
-			printf(w, "(%s%s)[k] = %s(%sv)\n", derefMap, newVarName, newFuncName, toPtrItem)
-		} else {
-			printf(w, "%s[k] = %s(%sv)\n", newVarName, newFuncName, toPtrItem)
-		}
-		printf(w, "}\n")
-	}
-
-	printf(w, "var %s %s\n", newVarName, formatType(p.Type))
-
-	if !p.Type.MapValueType.OriginalType.IsPtr {
-		toPtrItem = "&"
-	}
-
-	if p.Type.IsPtr {
-		derefMap = "*"
-		refMap = "&"
-		printf(w, "if %s != nil {\n", oldVarName)
-		wrap()
-		printf(w, "}\n")
-	} else {
-		wrap()
-	}
-}
-
-func wrapParams(w io.Writer, method *Method, varNames []string) []string {
-	for i, p := range method.ReturnType {
-		if p.Interface != nil {
-			oldVarName := varNames[i]
-			newVarName := fmt.Sprintf("newv%d", i)
-			varNames[i] = newVarName
-
-			if p.Type.IsMap {
-				wrapMapParam(w, oldVarName, newVarName, p)
-			} else {
-				if p.Type.IsArray {
-					wrapArrayParam(w, oldVarName, newVarName, p)
-				} else {
-					ref := ""
-					newFuncName := fmt.Sprintf("New%s", p.Interface.Name)
-					if p.Type.LocalPkgName() != "" {
-						newFuncName = p.Type.LocalPkgName() + "." + newFuncName
-					}
-					if !p.Type.OriginalType.IsPtr {
-						ref = "&"
-					}
-					printf(w, "%s := %s(%s%s)\n", newVarName, newFuncName, ref, oldVarName)
-				}
-			}
-		}
-	}
-	return varNames
-}
-
-func unwrapArrayParam(w io.Writer, oldVarName, newVarName string, t *Type) {
-	derefItem := ""
+func unwrapArrayType(w io.Writer, oldT, newT *ArrayType, varBaseName string, i int) int {
+	oldVarName, newVarName := getVarNames(varBaseName, i)
 	derefArray := ""
 
 	unwrap := func() {
-		printf(w, "for _, v := range %s%s {\n", derefArray, oldVarName)
-		printf(w, "%s%s = append(%s%s, %sv.GetImpl())\n", derefArray, newVarName, derefArray, newVarName, derefItem)
+		innerVarBaseName := "it"
+		oldInnerVar, _ := getVarNames(innerVarBaseName, 0)
+
+		printf(w, "for _, %s := range %s%s {\n", oldInnerVar, derefArray, oldVarName)
+		vi := unwrapType(w, oldT.Type, newT.Type, innerVarBaseName, 0)
+		newInnerVar, _ := getVarNames(innerVarBaseName, vi)
+
+		printf(w, "%s%s = append(%s%s, %s)\n", derefArray, newVarName, derefArray, newVarName, newInnerVar)
 		printf(w, "}\n")
 	}
 
-	printf(w, "var %s %s\n", newVarName, formatType(t.OriginalType))
-
-	if !t.OriginalType.IsArrayTypePtr {
-		derefItem = "*"
-	}
-
-	if t.IsPtr {
+	printf(w, "var %s %s\n", newVarName, formatType(oldT))
+	if newT.IsPtr {
 		derefArray = "*"
 		printf(w, "if %s != nil {\n", oldVarName)
 		unwrap()
@@ -255,31 +169,36 @@ func unwrapArrayParam(w io.Writer, oldVarName, newVarName string, t *Type) {
 	} else {
 		unwrap()
 	}
+
+	return i + 1
 }
 
-func unwrapMapParam(w io.Writer, oldVarName, newVarName string, t *Type) {
-	derefValue := ""
+func unwrapMapType(w io.Writer, oldT, newT *MapType, varBaseName string, i int) int {
+	oldVarName, newVarName := getVarNames(varBaseName, i)
 	derefMap := ""
 	refMap := ""
 
 	unwrap := func() {
-		printf(w, "%s = %s%s{}\n", newVarName, refMap, formatTypeWithoutLeadingPtr(t.OriginalType))
-		printf(w, "for k, v := range %s%s {\n", derefMap, oldVarName)
+		printf(w, "%s = %s%s{}\n", newVarName, refMap, formatTypeWithoutLeadingPtr(oldT))
+
+		innerVarBaseName := "it"
+		oldInnerVar, _ := getVarNames(innerVarBaseName, 0)
+
+		printf(w, "for k, %s := range %s%s {\n", oldInnerVar, derefMap, oldVarName)
+		vi := unwrapType(w, oldT.ValueType, newT.ValueType, innerVarBaseName, 0)
+		newInnerVar, _ := getVarNames(innerVarBaseName, vi)
+
 		if derefMap != "" {
-			printf(w, "(%s%s)[k] = %sv.GetImpl()\n", derefMap, newVarName, derefValue)
+			printf(w, "(%s%s)[k] = %s\n", derefMap, newVarName, newInnerVar)
 		} else {
-			printf(w, "%s[k] = %sv.GetImpl()\n", newVarName, derefValue)
+			printf(w, "%s[k] = %s\n", newVarName, newInnerVar)
 		}
 		printf(w, "}\n")
 	}
 
-	printf(w, "var %s %s\n", newVarName, formatType(t.OriginalType))
+	printf(w, "var %s %s\n", newVarName, formatType(oldT))
 
-	if !t.OriginalType.IsArrayTypePtr {
-		derefValue = "*"
-	}
-
-	if t.IsPtr {
+	if newT.IsPtr {
 		derefMap = "*"
 		refMap = "&"
 		printf(w, "if %s != nil {\n", oldVarName)
@@ -288,6 +207,36 @@ func unwrapMapParam(w io.Writer, oldVarName, newVarName string, t *Type) {
 	} else {
 		unwrap()
 	}
+
+	return i + 1
+}
+
+func unwrapType(w io.Writer, oldT, newT Type, varBaseName string, i int) int {
+	if _, ok := newT.(*ModeledType); ok {
+		oldVarName, newVarName := getVarNames(varBaseName, i)
+		if oldT.(*ModeledType).IsPtr {
+			printf(w, "%s := %s.GetImpl()\n", newVarName, oldVarName)
+		} else {
+			printf(w, "%s := *%s.GetImpl()\n", newVarName, oldVarName)
+		}
+		return i + 1
+	}
+
+	switch tt := oldT.(type) {
+	case *ArrayType:
+		return unwrapArrayType(w, tt, newT.(*ArrayType), varBaseName, i)
+	case *MapType:
+		return unwrapMapType(w, tt, newT.(*MapType), varBaseName, i)
+	default:
+		panic(fmt.Errorf("unsupported type: %T->%T", newT, oldT))
+	}
+	return i
+}
+
+func unwrapParam(w io.Writer, p *Param) string {
+	i := unwrapType(w, p.Type.OriginalType, p.Type.Type, p.Name, 0)
+	newVarName, _ := getVarNames(p.Name, i)
+	return newVarName
 }
 
 func unwrapParams(w io.Writer, params ParamsList) []string {
@@ -296,27 +245,119 @@ func unwrapParams(w io.Writer, params ParamsList) []string {
 		unwrappedVarNames = append(unwrappedVarNames, p.Name)
 	}
 	for i, p := range params {
-		if p.Interface != nil {
-			oldVarName := unwrappedVarNames[i]
-			newVarName := fmt.Sprintf("new%s", oldVarName)
+		if p.Type.OriginalType != nil {
+			newVarName := unwrapParam(w, p)
 			unwrappedVarNames[i] = newVarName
-			deref := ""
-
-			if p.Type.IsMap {
-				unwrapMapParam(w, oldVarName, newVarName, p.Type)
-			} else {
-				if p.Type.IsArray {
-					unwrapArrayParam(w, oldVarName, newVarName, p.Type)
-				} else {
-					if !p.Type.OriginalType.IsPtr {
-						deref = "*"
-					}
-					printf(w, "%s := %s%s.GetImpl()\n", newVarName, deref, oldVarName)
-				}
-			}
 		}
 	}
 	return unwrappedVarNames
+}
+
+func wrapParam(w io.Writer, p *Param, paramName string) string {
+	if paramName == "" {
+		paramName = p.Name
+	}
+	i := wrapType(w, p.Type.OriginalType, p.Type.Type, paramName, 0)
+	newVarName, _ := getVarNames(paramName, i)
+	return newVarName
+}
+
+func wrapParams(w io.Writer, method *Method, varNames []string) []string {
+	for i, p := range method.ReturnType {
+		if p.Type.OriginalType != nil {
+			varNames[i] = wrapParam(w, p, varNames[i])
+		}
+	}
+	return varNames
+}
+
+func wrapType(w io.Writer, oldT, newT Type, varBaseName string, i int) int {
+	if mt, ok := newT.(*ModeledType); ok {
+		oldVarName, newVarName := getVarNames(varBaseName, i)
+		if oldT.(*ModeledType).IsPtr {
+			printf(w, "%s := %s(%s)\n", newVarName, mt.NewFuncNameForPkg, oldVarName)
+		} else {
+			printf(w, "%s := %s(&%s)\n", newVarName, mt.NewFuncNameForPkg, oldVarName)
+		}
+		return i + 1
+	}
+
+	switch tt := oldT.(type) {
+	case *ArrayType:
+		return wrapArrayType(w, tt, newT.(*ArrayType), varBaseName, i)
+	case *MapType:
+		return wrapMapType(w, tt, newT.(*MapType), varBaseName, i)
+	default:
+		panic(fmt.Errorf("unsupported type: %T->%T", oldT, newT))
+	}
+	return i
+}
+
+func wrapArrayType(w io.Writer, oldT, newT *ArrayType, varBaseName string, i int) int {
+	oldVarName, newVarName := getVarNames(varBaseName, i)
+	derefArray := ""
+
+	wrap := func() {
+		innerVarBaseName := "it"
+		oldInnerVar, _ := getVarNames(innerVarBaseName, 0)
+
+		printf(w, "for _, %s := range %s%s {\n", oldInnerVar, derefArray, oldVarName)
+		vi := wrapType(w, oldT.Type, newT.Type, innerVarBaseName, 0)
+		newInnerVar, _ := getVarNames(innerVarBaseName, vi)
+
+		printf(w, "%s%s = append(%s%s, %s)\n", derefArray, newVarName, derefArray, newVarName, newInnerVar)
+		printf(w, "}\n")
+	}
+
+	printf(w, "var %s %s\n", newVarName, formatType(newT))
+
+	if oldT.IsPtr {
+		derefArray = "*"
+		printf(w, "if %s != nil {\n", oldVarName)
+		wrap()
+		printf(w, "}\n")
+	} else {
+		wrap()
+	}
+
+	return i + 1
+}
+
+func wrapMapType(w io.Writer, oldT, newT *MapType, varBaseName string, i int) int {
+	oldVarName, newVarName := getVarNames(varBaseName, i)
+	derefMap := ""
+	refMap := ""
+
+	wrap := func() {
+		printf(w, "%s = %s%s{}\n", newVarName, refMap, formatTypeWithoutLeadingPtr(newT))
+
+		innerVarBaseName := "it"
+		oldInnerVar, _ := getVarNames(innerVarBaseName, 0)
+
+		printf(w, "for k, %s := range %s%s {\n", oldInnerVar, derefMap, oldVarName)
+		vi := wrapType(w, oldT.ValueType, newT.ValueType, innerVarBaseName, 0)
+		newInnerVar, _ := getVarNames(innerVarBaseName, vi)
+
+		if derefMap != "" {
+			printf(w, "(%s%s)[k] = %s\n", derefMap, newVarName, newInnerVar)
+		} else {
+			printf(w, "%s[k] = %s\n", newVarName, newInnerVar)
+		}
+		printf(w, "}\n")
+	}
+
+	printf(w, "var %s %s\n", newVarName, formatType(newT))
+
+	if oldT.IsPtr {
+		derefMap = "*"
+		refMap = "&"
+		printf(w, "if %s != nil {\n", oldVarName)
+		wrap()
+		printf(w, "}\n")
+	} else {
+		wrap()
+	}
+	return i + 1
 }
 
 func formatParams(params ParamsList) string {
@@ -332,35 +373,42 @@ func formatParams(params ParamsList) string {
 	return strings.Join(strs, ", ")
 }
 
-func formatTypeWithoutLeadingPtr(t *Type) string {
+func formatTypeWithoutLeadingPtr(t Type) string {
 	return formatTypeWithOptions(t, true)
 }
 
-func formatType(t *Type) string {
+func formatType(t Type) string {
 	return formatTypeWithOptions(t, false)
 }
 
-func formatTypeWithOptions(t *Type, ignoreLeadingPtr bool) string {
-	var parts []string
-	if !ignoreLeadingPtr && t.IsPtr {
-		parts = append(parts, "*")
-	}
-	if t.IsArray {
-		parts = append(parts, "[]")
-		if t.IsArrayTypePtr {
-			parts = append(parts, "*")
+func formatTypeWithOptions(t Type, ignoreLeadingPtr bool) string {
+	switch tt := t.(type) {
+	case *TopLevelType:
+		return formatTypeWithOptions(tt.Type, ignoreLeadingPtr)
+	case *ModeledType:
+		if tt.IsPtr && !ignoreLeadingPtr {
+			return "*" + tt.LocalNameForPkg
+		} else {
+			return tt.LocalNameForPkg
+		}
+	case *ArrayType:
+		if tt.IsPtr && !ignoreLeadingPtr {
+			return "*[]" + formatTypeWithOptions(tt.Type, false)
+		} else {
+			return "[]" + formatTypeWithOptions(tt.Type, false)
+		}
+	case *MapType:
+		if tt.IsPtr && !ignoreLeadingPtr {
+			return fmt.Sprintf("*map[%s]%s",
+				formatTypeWithOptions(tt.KeyType, false),
+				formatTypeWithOptions(tt.ValueType, false))
+		} else {
+			return fmt.Sprintf("map[%s]%s",
+				formatTypeWithOptions(tt.KeyType, false),
+				formatTypeWithOptions(tt.ValueType, false))
 		}
 	}
-	if t.IsMap {
-		parts = append(parts, "map[")
-		parts = append(parts, formatType(t.MapKeyType))
-		parts = append(parts, "]")
-		parts = append(parts, formatType(t.MapValueType))
-		return strings.Join(parts, "")
-	}
-
-	parts = append(parts, t.Name)
-	return strings.Join(parts, "")
+	panic(fmt.Errorf("unsupported type: %T", t))
 }
 
 func printf(w io.Writer, s string, args ...interface{}) {

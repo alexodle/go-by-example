@@ -2,6 +2,7 @@ package destructor
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 )
 
@@ -17,6 +18,12 @@ func Remodel(structs StructStore, inputDir, outputDir string) []*File {
 			continue
 		}
 		filesList = append(filesList, iface.File)
+
+		sort.Sort(iface.File.Interfaces)
+		for _, iface := range iface.File.Interfaces {
+			sort.Sort(iface.Methods)
+		}
+
 		seenFiles[iface.File.Path] = struct{}{}
 	}
 	return filesList
@@ -59,7 +66,6 @@ func (m *modeler) buildWrappers() {
 		newIFace := &Interface{
 			File:                   newFile,
 			Name:                   st.Name,
-			FullName:               newFile.Package.Path + "." + st.Name,
 			Methods:                MethodList{},
 			OriginalStruct:         st,
 			OriginalStructTypeName: "orig_" + st.File.Package.Name + "." + st.Name,
@@ -72,12 +78,14 @@ func (m *modeler) buildWrappers() {
 func (m *modeler) fillWrappers() {
 	for _, iface := range m.wrapperStore {
 		newStructName := strings.ToLower(iface.OriginalStruct.Name[0:1]) + iface.OriginalStruct.Name[1:] + "Wrapper"
-		recvParam := &Param{Name: "o", Type: &Type{IsPtr: true, Name: newStructName}}
+		recvParam := &Param{Name: "o", Type: &TopLevelType{Type: &ModeledType{
+			BaseType:        BaseType{Name: newStructName, IsPtr: true},
+			LocalNameForPkg: newStructName,
+		}}}
 
 		iface.WrapperStruct = &Struct{
 			File:          iface.File,
 			Name:          newStructName,
-			FullName:      newStructName,
 			PublicMethods: MethodList{},
 		}
 
@@ -89,8 +97,8 @@ func (m *modeler) fillWrappers() {
 				fmt.Printf("WARN: skipping getter/setter methods for field:%s.%s, at least one param or return type is not currently supported\n", iface.Name, f.Name)
 				continue
 			}
-			setParams := ParamsList{&Param{Name: "v", Type: f.Type, Interface: f.Interface}}
-			getReturnType := ParamsList{&Param{Type: f.Type, Interface: f.Interface}}
+			setParams := ParamsList{&Param{Name: "v", Type: f.Type}}
+			getReturnType := ParamsList{&Param{Type: f.Type}}
 			iface.Methods = append(iface.Methods,
 				&Method{
 					Name:       "Get" + f.Name,
@@ -150,101 +158,105 @@ func (m *modeler) convertTypesForFile(f *File, params ParamsList) (ParamsList, I
 	var newParams ParamsList
 	importStore := ImportStore{}
 	for _, p := range params {
-		t, imps, iface := m.convertTypeForFile(f, p.Type)
+		t, imps := m.convertTypeForFile(f, p.Type)
 		newParams = append(newParams, &Param{
-			Name:      p.Name,
-			Type:      t,
-			Interface: iface,
+			Name: p.Name,
+			Type: t,
 		})
 		importStore.AddAll(imps)
 	}
 	return newParams, importStore
 }
 
-func (m *modeler) convertMapTypeForFile(f *File, t *Type) (*Type, ImportStore, *Interface) {
-	// shallow copy
-	var newType = *t
-	newType.OriginalType = t
-
-	keyType, imports1, key_iface := m.convertTypeForFile(f, t.MapKeyType)
-	if key_iface != nil {
-		panic(fmt.Errorf("struct map keys not supported yet: %s", key_iface.OriginalStruct.FullName))
+func (m *modeler) convertTypeForFile(f *File, t *TopLevelType) (*TopLevelType, ImportStore) {
+	newType, imports, hasWrapper := m.convertTypeForFileRecursive(f, t.Type, false)
+	tt := &TopLevelType{Type: newType}
+	if hasWrapper {
+		origT, origImports, _ := m.convertTypeForFileRecursive(f, t.Type, true)
+		imports.AddAll(origImports)
+		tt.OriginalType = origT
 	}
-	newType.MapKeyType = keyType
-
-	valType, imports2, iface := m.convertTypeForFile(f, t.MapValueType)
-	newType.MapValueType = valType
-
-	imports1.AddAll(imports2)
-	return &newType, imports1, iface
+	return tt, imports
 }
 
-func (m *modeler) convertTypeForFile(f *File, t *Type) (*Type, ImportStore, *Interface) {
-	if t.IsMap {
-		return m.convertMapTypeForFile(f, t)
+func (m *modeler) convertMapTypeForFile(f *File, t *MapType, ignoreWrappers bool) (Type, ImportStore, bool) {
+	// shallow copy
+	var newType = t.ShallowCopy().(*MapType)
+
+	keyType, imports1, hasWrapper1 := m.convertTypeForFileRecursive(f, t.KeyType, ignoreWrappers)
+	if hasWrapper1 {
+		panic(fmt.Errorf("map structs not supported"))
+	}
+	newType.KeyType = keyType
+
+	valType, imports2, hasWrapper2 := m.convertTypeForFileRecursive(f, t.ValueType, ignoreWrappers)
+	newType.ValueType = valType
+
+	imports1.AddAll(imports2)
+	return newType, imports1, hasWrapper2
+}
+
+func (m *modeler) convertTypeForFileRecursive(f *File, t Type, ignoreWrappers bool) (Type, ImportStore, bool) {
+	switch tt := t.(type) {
+	case *MapType:
+		return m.convertMapTypeForFile(f, tt, ignoreWrappers)
+	case *ArrayType:
+		newType := tt.ShallowCopy().(*ArrayType)
+		ct, imps, hasWrapper := m.convertTypeForFileRecursive(f, tt.Type, ignoreWrappers)
+		newType.Type = ct
+		return newType, imps, hasWrapper
+	case *FuncType:
+		// Not impl
+		return t, ImportStore{}, false
 	}
 
-	if !strings.Contains(t.FullName, ".") {
-		return t, ImportStore{}, nil
+	tt := t.(*BaseType)
+	if tt.IsBuiltin {
+		return &ModeledType{
+			BaseType:        *tt,
+			LocalNameForPkg: tt.Name,
+		}, ImportStore{}, false
 	}
 
 	imports := ImportStore{}
-
-	var newType = *t // shallow copy
-	newType.OriginalType = t
-	newType.FullName = ""
-
-	var iface *Interface
-	fullTypeName := t.FullName
+	newType := &ModeledType{BaseType: *tt.ShallowCopy().(*BaseType)}
+	hasWrapper := false
 	prefix := "orig_"
-	if wrapper, ok := m.wrapperStore[fullTypeName]; ok {
-		newType.OriginalType.Name = "orig_" + newType.OriginalType.Name
-		addImportByFullName(newType.OriginalType.FullName, imports, "orig_")
 
-		if newType.IsArray {
-			newType.IsArrayTypePtr = false
-		} else {
-			newType.IsPtr = false
-		}
+	if wrapper, ok := m.wrapperStore[tt.FullName()]; !ignoreWrappers && ok {
+		prefix = ""
+		hasWrapper = true
+		newType.IsPtr = false // interfaces are always inherently pointers
+		newType.Interface = wrapper
+		newType.Package = wrapper.File.Package
 
 		if wrapper.File.Package.Path == f.Package.Path {
-			newType.Name = wrapper.Name
-			return &newType, imports, wrapper
+			newType.LocalNameForPkg = wrapper.Name
+			newType.NewFuncNameForPkg = "New" + wrapper.Name
+			return newType, imports, hasWrapper
 		}
-
-		iface = wrapper
-		prefix = ""
-		fullTypeName = wrapper.FullName
 	}
 
-	parts := strings.Split(fullTypeName, "/")
-	newType.Name = prefix + parts[len(parts)-1]
-	addImportByFullName(fullTypeName, imports, prefix)
-	return &newType, imports, iface
+	localizeType(newType, imports, prefix)
+	return newType, imports, hasWrapper
 }
 
-func addImportByFullName(tn string, imports ImportStore, namePrefix string) {
-	name, path, ok := extractImportFromFullPath(tn)
-	if !ok {
-		panic(fmt.Errorf("failed to parse fullname: %s", tn))
+func localizeType(t *ModeledType, imports ImportStore, namePrefix string) {
+	importName := namePrefix + t.Package.Name
+
+	requiredImport := &Import{ExplicitName: importName, Path: t.Package.Path}
+	imports[importName] = requiredImport
+
+	t.LocalNameForPkg = combine(".", importName, t.Name)
+	if t.Interface != nil {
+		t.NewFuncNameForPkg = combine(".", importName, "New"+t.Name)
 	}
-	imports[namePrefix+name] = &Import{ExplicitName: namePrefix + name, Path: path}
 }
 
-func extractImportFromFullPath(tn string) (string, string, bool) {
-	slashSplits := strings.Split(tn, "/")
-	nameParts := slashSplits[len(slashSplits)-1]
-	typeName := strings.Split(nameParts, ".")
-	if len(typeName) > 1 {
-		importPath := strings.TrimSuffix(tn, "."+typeName[1])
-		return typeName[0], importPath, true
-	}
-
-	return "", "", false
-}
-
-func isUnsupportedType(t *Type) bool {
-	return t.IsFunc
+func isUnsupportedType(t *TopLevelType) bool {
+	baseType := t.GetBaseType()
+	_, isFuncType := baseType.(*FuncType)
+	return isFuncType
 }
 
 func hasUnsupportedType(params ParamsList) bool {

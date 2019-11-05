@@ -119,7 +119,7 @@ func fillMethods(node ast.Node, directory string, structs StructStore, store Imp
 		case *ast.FuncDecl:
 			m := newMethod(v, structs, pkg, store)
 			if m.Receiver != nil && isPublic(m.Name) {
-				s := structs[m.Receiver.Type.FullName]
+				s := structs[m.Receiver.Type.Type.(*BaseType).FullName()]
 				s.PublicMethods = append(s.PublicMethods, m)
 			}
 		case *ast.TypeSpec:
@@ -139,7 +139,7 @@ func fillStructs(node ast.Node, directory string, structs StructStore, file *Fil
 		case *ast.TypeSpec:
 			if _, ok := v.Type.(*ast.StructType); ok {
 				s := newStruct(v, file)
-				structs[s.FullName] = s
+				structs[s.FullName()] = s
 			}
 		}
 		return true
@@ -150,7 +150,6 @@ func newStruct(v *ast.TypeSpec, file *File) *Struct {
 	return &Struct{
 		File:          file,
 		Name:          v.Name.Name,
-		FullName:      fullTypeName(file.Package, v.Name.Name),
 		PublicMethods: MethodList{},
 	}
 }
@@ -159,15 +158,15 @@ func newFields(v *ast.StructType, structs StructStore, pkg *Package, imports Imp
 	var fields ParamsList
 	if v.Fields != nil {
 		for _, f := range v.Fields.List {
-			t := getTypeName(f.Type, structs, pkg, imports)
+			t := parseType(f.Type, structs, pkg, imports)
 			if f.Names != nil {
 				for _, pn := range f.Names {
 					if isPublic(pn.Name) {
 						fields = append(fields, &Param{Name: pn.Name, Type: t})
 					}
 				}
-			} else if isPublic(t.Name) {
-				fields = append(fields, &Param{Name: t.Name, Type: t})
+			} else if isPublic(t.Type.(*BaseType).Name) {
+				fields = append(fields, &Param{Name: t.Type.(*BaseType).Name, Type: t})
 			}
 		}
 	}
@@ -189,7 +188,7 @@ func getReturnParams(fieldList *ast.FieldList, structs StructStore, pkg *Package
 	}
 	var params []*Param
 	for _, p := range fieldList.List {
-		t := getTypeName(p.Type, structs, pkg, imports)
+		t := parseType(p.Type, structs, pkg, imports)
 		if p.Names != nil {
 			for _, pn := range p.Names {
 				params = append(params, &Param{Name: pn.Name, Type: t})
@@ -207,7 +206,7 @@ func getParams(fieldList *ast.FieldList, structs StructStore, pkg *Package, impo
 	}
 	var params []*Param
 	for _, p := range fieldList.List {
-		t := getTypeName(p.Type, structs, pkg, imports)
+		t := parseType(p.Type, structs, pkg, imports)
 		for _, pn := range p.Names {
 			params = append(params, &Param{Name: pn.Name, Type: t})
 		}
@@ -215,64 +214,57 @@ func getParams(fieldList *ast.FieldList, structs StructStore, pkg *Package, impo
 	return params
 }
 
-func getTypeName(exp ast.Expr, structs StructStore, pkg *Package, imports ImportStore) *Type {
-	var fullName string
-	var name string
+func parseType(exp ast.Expr, structs StructStore, pkg *Package, imports ImportStore) *TopLevelType {
+	t := parseTypeRecursive(exp, structs, pkg, imports)
+	return &TopLevelType{Type: t}
+}
+
+func addStar(t Type) Type {
+	switch tt := t.(type) {
+	case *BaseType:
+		tt.IsPtr = true
+	case *ArrayType:
+		tt.IsPtr = true
+	case *MapType:
+		tt.IsPtr = true
+	default:
+		panic(fmt.Errorf("cannot add start to type: %T", t))
+	}
+	return t
+}
+
+func parseTypeRecursive(exp ast.Expr, structs StructStore, pkg *Package, imports ImportStore) Type {
 	switch xv := exp.(type) {
 	case *ast.Ident:
-		fullName = xv.Name
-		name = fullName
-	case *ast.StarExpr:
-		tn := getTypeName(xv.X, structs, pkg, imports)
-		tn.IsPtr = true
-		return tn
-	case *ast.SelectorExpr:
-		tn := getTypeName(xv.X, structs, pkg, imports)
-		fullName = tn.FullName + "." + xv.Sel.Name
-		name = fullName
-		if imp, ok := imports[tn.FullName]; ok {
-			fullName = imp.Path + "." + xv.Sel.Name
+		if isBuiltin(xv.Name) {
+			return &BaseType{Name: xv.Name, IsBuiltin: true}
 		}
-	case *ast.ArrayType:
-		tn := getTypeName(xv.Elt, structs, pkg, imports)
-		return &Type{
-			FullName:       tn.FullName,
-			Name:           tn.Name,
-			IsArray:        true,
-			IsArrayTypePtr: tn.IsPtr,
-		}
-	case *ast.MapType:
-		ktype := getTypeName(xv.Key, structs, pkg, imports)
-		vtype := getTypeName(xv.Value, structs, pkg, imports)
-		return &Type{
-			IsMap:        true,
-			MapKeyType:   ktype,
-			MapValueType: vtype,
-		}
-	case *ast.FuncType:
-		return &Type{
-			IsFunc:         true,
-			FuncParams:     getParams(xv.Params, structs, pkg, imports),
-			FuncReturnType: getReturnParams(xv.Results, structs, pkg, imports),
-		}
+		return &BaseType{Name: xv.Name, Package: pkg}
 	case *ast.InterfaceType:
 		if xv.Methods != nil && xv.Methods.List != nil && len(xv.Methods.List) > 0 {
 			panic(fmt.Errorf("non-empty interface params not supported"))
 		}
-		return &Type{
-			Name:     "interface{}",
-			FullName: "interface{}",
+		return &BaseType{Name: "interface{}", IsBuiltin: true}
+	case *ast.SelectorExpr:
+		imp := imports[xv.X.(*ast.Ident).Name]
+		return &BaseType{Name: xv.Sel.Name, Package: &Package{Name: imp.ImplicitName, Path: imp.Path}}
+	case *ast.StarExpr:
+		return addStar(parseTypeRecursive(xv.X, structs, pkg, imports))
+	case *ast.ArrayType:
+		return &ArrayType{Type: parseTypeRecursive(xv.Elt, structs, pkg, imports)}
+	case *ast.MapType:
+		return &MapType{
+			KeyType:   parseTypeRecursive(xv.Key, structs, pkg, imports),
+			ValueType: parseTypeRecursive(xv.Value, structs, pkg, imports),
+		}
+	case *ast.FuncType:
+		return &FuncType{
+			FuncParams:     getParams(xv.Params, structs, pkg, imports),
+			FuncReturnType: getReturnParams(xv.Results, structs, pkg, imports),
 		}
 	default:
 		panic(fmt.Sprintf("no type found: %T", exp))
 	}
-
-	potentialFullName := fullTypeName(pkg, fullName)
-	if _, ok := structs[potentialFullName]; ok {
-		fullName = potentialFullName
-	}
-
-	return &Type{FullName: fullName, Name: name}
 }
 
 func maybeNewReceiver(fn *ast.FuncDecl, structs StructStore, pkg *Package) *Param {
@@ -280,7 +272,7 @@ func maybeNewReceiver(fn *ast.FuncDecl, structs StructStore, pkg *Package) *Para
 
 	if fn.Recv != nil {
 		for _, f := range fn.Recv.List {
-			t := getTypeName(f.Type, structs, pkg, nil)
+			t := parseType(f.Type, structs, pkg, nil)
 			rec = &Param{
 				Name: f.Names[0].Name,
 				Type: t,
@@ -317,4 +309,32 @@ func getPkg(directory string) *Package {
 		Path: pkg.PkgPath,
 		Name: pkg.Name,
 	}
+}
+
+var builtins = map[string]struct{}{
+	"string":     {},
+	"bool":       {},
+	"int8":       {},
+	"uint8":      {},
+	"int16":      {},
+	"uint16":     {},
+	"int32":      {},
+	"uint32":     {},
+	"byte":       {},
+	"rune":       {},
+	"int64":      {},
+	"uint64":     {},
+	"int":        {},
+	"uint":       {},
+	"uintptr":    {},
+	"float32":    {},
+	"float64":    {},
+	"complex64":  {},
+	"complex128": {},
+	"error":      {},
+}
+
+func isBuiltin(name string) bool {
+	_, ok := builtins[name]
+	return ok
 }

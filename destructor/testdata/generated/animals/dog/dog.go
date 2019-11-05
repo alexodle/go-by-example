@@ -1,17 +1,17 @@
 package dog
 
-import animals "github.com/alexodle/go-by-example/destructor/testdata/actualoutput/animals"
-import food "github.com/alexodle/go-by-example/destructor/testdata/actualoutput/animals/food"
+import animals "github.com/alexodle/go-by-example/destructor/testdata/generated/animals"
+import food "github.com/alexodle/go-by-example/destructor/testdata/generated/animals/food"
 
 import orig_dog "github.com/alexodle/go-by-example/destructor/testdata/input/animals/dog"
 
 type Dog interface {
 	GetImpl() *orig_dog.Dog
-	Describe() animals.AnimalDescription
 	Barks() bool
-	Meows() bool
-	Eat(f food.Food) int
 	Clone() (Dog, error)
+	Describe() animals.AnimalDescription
+	Eat(f food.Food) int
+	Meows() bool
 }
 
 func NewDog(impl *orig_dog.Dog) Dog {
@@ -27,29 +27,29 @@ func (o *dogWrapper) GetImpl() *orig_dog.Dog {
 }
 
 func (o *dogWrapper) Describe() animals.AnimalDescription {
-	v0 := o.impl.Describe()
-	newv0 := animals.NewAnimalDescription(&v0)
-	return newv0
+	retval0 := o.impl.Describe()
+	retval0_1 := animals.NewAnimalDescription(&retval0)
+	return retval0_1
 }
 
 func (o *dogWrapper) Barks() bool {
-	v0 := o.impl.Barks()
-	return v0
+	retval0 := o.impl.Barks()
+	return retval0
 }
 
 func (o *dogWrapper) Meows() bool {
-	v0 := o.impl.Meows()
-	return v0
+	retval0 := o.impl.Meows()
+	return retval0
 }
 
 func (o *dogWrapper) Eat(f food.Food) int {
-	newf := f.GetImpl()
-	v0 := o.impl.Eat(newf)
-	return v0
+	f_1 := f.GetImpl()
+	retval0 := o.impl.Eat(f_1)
+	return retval0
 }
 
 func (o *dogWrapper) Clone() (Dog, error) {
-	v0, v1 := o.impl.Clone()
-	newv0 := NewDog(v0)
-	return newv0, v1
+	retval0, retval1 := o.impl.Clone()
+	retval0_1 := NewDog(retval0)
+	return retval0_1, retval1
 }
